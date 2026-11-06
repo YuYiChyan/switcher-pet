@@ -1,0 +1,485 @@
+{
+  "schema_version": 1,
+  "versions": [
+    {
+      "preview": 1,
+      "date": "2026-11-06",
+      "summary": "独立标识、数据路径隔离与 Windows 便携启动",
+      "release_tag": null,
+      "source_status": "consolidated-in-preview-14",
+      "exact_source_commit": null,
+      "artifact_status": "privacy-redacted-archive",
+      "files": [
+        {
+          "name": "SwitcherPet-preview-20261106-1-archive.zip",
+          "bytes": 16727518,
+          "sha256": "371e23c30387f7157a2139450f6aecbaef24931fffde710af3095b69bfde2602"
+        }
+      ],
+      "provenance": {
+        "kind": "historical-build-path-redacted",
+        "original_package_sha256": "92fa075ee1b741ccdc6691b70de9820e019bb0a35624bc6fdf074093ddb44fa5",
+        "original_executable_sha256": "fff527dadb61069c255b2aed083c69c0e16e2d88b6e4ce3d462383644ef52386",
+        "archived_executable_sha256": "6563712bf413c1f973893bae33533365000dfadb2c1278c92ef9de0255d6de68",
+        "compiler_path_replacements": 2053,
+        "compiler_symbol_replacements": 68,
+        "personal_application_identifier_anonymized": true,
+        "company_name_resource_replacements": 1,
+        "executable_sections_preserved": true,
+        "source_provenance": "Early previews were consolidated in preview 14; exact per-preview source snapshots were not retained.",
+        "validation": "Static PE integrity and privacy checks. Anonymized application identity can select a different WebView data directory; use the current release for daily use.",
+        "pe_integrity_check": "passed"
+      },
+      "privacy_check": "passed",
+      "publication_status": "local-only-not-published"
+    },
+    {
+      "preview": 2,
+      "date": "2026-11-06",
+      "summary": "模型路由、协议兼容、账号和子任务绑定",
+      "release_tag": null,
+      "source_status": "consolidated-in-preview-14",
+      "exact_source_commit": null,
+      "artifact_status": "privacy-redacted-archive",
+      "files": [
+        {
+          "name": "SwitcherPet-preview-20261106-2-archive.zip",
+          "bytes": 16754791,
+          "sha256": "fc682560099ddeb93f29410c1097e205c632e5ce7ddb5aa152766fa6fae8c140"
+        }
+      ],
+      "provenance": {
+        "kind": "historical-build-path-redacted",
+        "original_package_sha256": "47a5e679b710177008d7a8fc080f1ed91276042bc9d7da6acad229fb1a19eee0",
+        "original_executable_sha256": "1d9869602ac61462bea6455286a351f4b57be702d8bd13b4e3c39b00b6565e18",
+        "archived_executable_sha256": "07afd21e77c8aab17283eb2c5aba3b1e96809fd97c9d744b78186a88c39a88e2",
+        "compiler_path_replacements": 2051,
+        "compiler_symbol_replacements": 68,
+        "personal_application_identifier_anonymized": true,
+        "company_name_resource_replacements": 1,
+        "executable_sections_preserved": true,
+        "source_provenance": "Early previews were consolidated in preview 14; exact per-preview source snapshots were not retained.",
+        "validation": "Static PE integrity and privacy checks. Anonymized application identity can select a different WebView data directory; use the current release for daily use.",
+        "pe_integrity_check": "passed"
+      },
+      "privacy_check": "passed",
+      "publication_status": "local-only-not-published"
+    },
+    {
+      "preview": 3,
+      "date": "2026-11-06",
+      "summary": "模型开关、额度池、探针与桌宠入口",
+      "release_tag": null,
+      "source_status": "consolidated-in-preview-14",
+      "exact_source_commit": null,
+      "artifact_status": "privacy-redacted-archive",
+      "files": [
+        {
+          "name": "SwitcherPet-preview-20261106-3-archive.zip",
+          "bytes": 18679097,
+          "sha256": "8217e49edb8ab714b3cab05b6f132507c6532722c7ade67a3888feecc0255a09"
+        }
+      ],
+      "provenance": {
+        "kind": "historical-build-path-redacted",
+        "original_package_sha256": "a8d61fe1611100f2e9215877ca892c2ee0d6f899c9937d7afd59a63164056620",
+        "original_executable_sha256": "90dbfbbbaeee3a4bcfc05bed8af87e202f62f6a820dcb8ff38d25d26d0d03378",
+        "archived_executable_sha256": "7aedec1b03c03a4482d3d0eb874a5956550fb25d44a8746fc858d5fab8b6a98b",
+        "compiler_path_replacements": 2048,
+        "compiler_symbol_replacements": 68,
+        "personal_application_identifier_anonymized": true,
+        "company_name_resource_replacements": 1,
+        "executable_sections_preserved": true,
+        "source_provenance": "Early previews were consolidated in preview 14; exact per-preview source snapshots were not retained.",
+        "validation": "Static PE integrity and privacy checks. Anonymized application identity can select a different WebView data directory; use the current release for daily use.",
+        "pe_integrity_check": "passed"
+      },
+      "privacy_check": "passed",
+      "publication_status": "local-only-not-published"
+    },
+    {
+      "preview": 4,
+      "date": "2026-11-06",
+      "summary": "导入信息恢复、探针和静默启动",
+      "release_tag": null,
+      "source_status": "consolidated-in-preview-14",
+      "exact_source_commit": null,
+      "artifact_status": "privacy-redacted-archive",
+      "files": [
+        {
+          "name": "SwitcherPet-preview-20261106-4-archive.zip",
+          "bytes": 18739443,
+          "sha256": "5575607f7331e7e3395827c0733b0c63a37b27d2f3fbb230c0a19ac8887726ab"
+        }
+      ],
+      "provenance": {
+        "kind": "historical-build-path-redacted",
+        "original_package_sha256": "4d2ff4f172f2eb811913b08063fb085c71a75942d4d01e262cc13a5b6ee5f50b",
+        "original_executable_sha256": "9e633499e1d0c932675d9353304caecee650c0d2e6935e2a625f34a02d5f2cf5",
+        "archived_executable_sha256": "13065f735ffa0b4f21fa1dfe675f1c36998933cc4abe5a54e60a42f683989538",
+        "compiler_path_replacements": 2046,
+        "compiler_symbol_replacements": 68,
+        "personal_application_identifier_anonymized": true,
+        "company_name_resource_replacements": 1,
+        "executable_sections_preserved": true,
+        "source_provenance": "Early previews were consolidated in preview 14; exact per-preview source snapshots were not retained.",
+        "validation": "Static PE integrity and privacy checks. Anonymized application identity can select a different WebView data directory; use the current release for daily use.",
+        "pe_integrity_check": "passed"
+      },
+      "privacy_check": "passed",
+      "publication_status": "local-only-not-published"
+    },
+    {
+      "preview": 5,
+      "date": "2026-11-06",
+      "summary": "捏一捏、音效与桌面交互修正",
+      "release_tag": null,
+      "source_status": "consolidated-in-preview-14",
+      "exact_source_commit": null,
+      "artifact_status": "privacy-redacted-archive",
+      "files": [
+        {
+          "name": "SwitcherPet-preview-20261106-5-archive.zip",
+          "bytes": 18741944,
+          "sha256": "8b8b70c8a044782092bc0333b3d8cbfcbdd066f9f56f3ffd7f854a16fe4987f6"
+        }
+      ],
+      "provenance": {
+        "kind": "historical-build-path-redacted",
+        "original_package_sha256": "564b13331239aec1447982537724ebff7d4bf7a7c0bb60dafd0af781cdc00d2a",
+        "original_executable_sha256": "0bad70a9bfc1a7405fddf0377a8c244f94a93779848737fe786dab8c91ecad85",
+        "archived_executable_sha256": "71d0e07d8deab77891208a7066d4e6c45e378bb451d4f44ce843c076ff155fef",
+        "compiler_path_replacements": 2046,
+        "compiler_symbol_replacements": 68,
+        "personal_application_identifier_anonymized": true,
+        "company_name_resource_replacements": 1,
+        "executable_sections_preserved": true,
+        "source_provenance": "Early previews were consolidated in preview 14; exact per-preview source snapshots were not retained.",
+        "validation": "Static PE integrity and privacy checks. Anonymized application identity can select a different WebView data directory; use the current release for daily use.",
+        "pe_integrity_check": "passed"
+      },
+      "privacy_check": "passed",
+      "publication_status": "local-only-not-published"
+    },
+    {
+      "preview": 6,
+      "date": "2026-11-06",
+      "summary": "简洁余额组件、随机气泡与 Google 工具转换",
+      "release_tag": null,
+      "source_status": "consolidated-in-preview-14",
+      "exact_source_commit": null,
+      "artifact_status": "privacy-redacted-archive",
+      "files": [
+        {
+          "name": "SwitcherPet-preview-20261106-6-archive.zip",
+          "bytes": 18755924,
+          "sha256": "b17f86dfbbca1e2e2c0d48bab4c881ba1856996581ef9e512c4c451c4c1b976f"
+        }
+      ],
+      "provenance": {
+        "kind": "historical-build-path-redacted",
+        "original_package_sha256": "a6e99012259f5732ce8b97854c9c28a4e7030866cbda9ab614b6155a60a1a5d6",
+        "original_executable_sha256": "641aa419439a9eadda40b8093265301591b08130444eb111d58fd30190f287cc",
+        "archived_executable_sha256": "605d3be6c0871f08f8725b9c257f14da6c74cd2b9588fd37a0aee2dce5fa0ffa",
+        "compiler_path_replacements": 2055,
+        "compiler_symbol_replacements": 68,
+        "personal_application_identifier_anonymized": true,
+        "company_name_resource_replacements": 1,
+        "executable_sections_preserved": true,
+        "source_provenance": "Early previews were consolidated in preview 14; exact per-preview source snapshots were not retained.",
+        "validation": "Static PE integrity and privacy checks. Anonymized application identity can select a different WebView data directory; use the current release for daily use.",
+        "pe_integrity_check": "passed"
+      },
+      "privacy_check": "passed",
+      "publication_status": "local-only-not-published"
+    },
+    {
+      "preview": 7,
+      "date": "2026-11-06",
+      "summary": "默认代理端口统一为 18080",
+      "release_tag": null,
+      "source_status": "consolidated-in-preview-14",
+      "exact_source_commit": null,
+      "artifact_status": "development-record",
+      "files": [],
+      "publication_status": "local-only-not-published"
+    },
+    {
+      "preview": 8,
+      "date": "2026-11-06",
+      "summary": "长按切换视图、星空额度条和统一账号来源",
+      "release_tag": null,
+      "source_status": "consolidated-in-preview-14",
+      "exact_source_commit": null,
+      "artifact_status": "privacy-redacted-archive",
+      "files": [
+        {
+          "name": "SwitcherPet-preview-20261106-8-archive.zip",
+          "bytes": 18826594,
+          "sha256": "05b1808e45e94fe2e723e48c966382d32bb80233190c1af3990f546a56b0ab29"
+        }
+      ],
+      "provenance": {
+        "kind": "historical-build-path-redacted",
+        "original_package_sha256": "5d58d2bfb01779d216403c34b6fab9d15dd043528d3baa2aeff74a7e11849c3e",
+        "original_executable_sha256": "ca40dd81c0b28da39265e55da0c6ec70cdc480bd134d580c90f2cf6b1d023092",
+        "archived_executable_sha256": "020857858ab2449eec844a7cf6ef65c51c13261f28d352331d89ba472b77cea6",
+        "compiler_path_replacements": 2059,
+        "compiler_symbol_replacements": 68,
+        "personal_application_identifier_anonymized": true,
+        "company_name_resource_replacements": 1,
+        "executable_sections_preserved": true,
+        "source_provenance": "Early previews were consolidated in preview 14; exact per-preview source snapshots were not retained.",
+        "validation": "Static PE integrity and privacy checks. Anonymized application identity can select a different WebView data directory; use the current release for daily use.",
+        "pe_integrity_check": "passed"
+      },
+      "privacy_check": "passed",
+      "publication_status": "local-only-not-published"
+    },
+    {
+      "preview": 9,
+      "date": "2026-11-06",
+      "summary": "五小时受限池与模型目录刷新",
+      "release_tag": null,
+      "source_status": "consolidated-in-preview-14",
+      "exact_source_commit": null,
+      "artifact_status": "privacy-redacted-archive",
+      "files": [
+        {
+          "name": "SwitcherPet-preview-20261106-9-archive.zip",
+          "bytes": 18827038,
+          "sha256": "eac622e55a771c965771dacf2933c161d7a72708f1887625ff64c51c6f257892"
+        }
+      ],
+      "provenance": {
+        "kind": "historical-build-path-redacted",
+        "original_package_sha256": "27945e5d8e238643d030447b70b61a33c66de232fda799d6cc7d53de6a5e5a4a",
+        "original_executable_sha256": "1581d4654e35a7b4dd154adbc61c70830d7f1edad3186481daf9b8afa0361052",
+        "archived_executable_sha256": "4b2eb53a3075fa9f2ed1fee35f87277e676feea8fdfb728c90bc3ea29862ba65",
+        "compiler_path_replacements": 2059,
+        "compiler_symbol_replacements": 68,
+        "personal_application_identifier_anonymized": true,
+        "company_name_resource_replacements": 1,
+        "executable_sections_preserved": true,
+        "source_provenance": "Early previews were consolidated in preview 14; exact per-preview source snapshots were not retained.",
+        "validation": "Static PE integrity and privacy checks. Anonymized application identity can select a different WebView data directory; use the current release for daily use.",
+        "pe_integrity_check": "passed"
+      },
+      "privacy_check": "passed",
+      "publication_status": "local-only-not-published"
+    },
+    {
+      "preview": 10,
+      "date": "2026-11-06",
+      "summary": "原生/API 逻辑模型合并及统一路由选择器",
+      "release_tag": null,
+      "source_status": "consolidated-in-preview-14",
+      "exact_source_commit": null,
+      "artifact_status": "privacy-redacted-archive",
+      "files": [
+        {
+          "name": "SwitcherPet-preview-20261106-10-archive.zip",
+          "bytes": 18825662,
+          "sha256": "09585b2e1debdcbc9bf2d65bdfc7b831964efd3daeaf6abedffe880180efbe3d"
+        }
+      ],
+      "provenance": {
+        "kind": "historical-build-path-redacted",
+        "original_package_sha256": "ad86247b978e6fdffbc2560aa98b297d00c45e916fea1e428649e743524649fe",
+        "original_executable_sha256": "d0f826c39193b7f9a6c13a3c0f9a8ff310df112f3e0843fe497d07309989d1fa",
+        "archived_executable_sha256": "a372879af63b227f1be27c55979614ff1ace70ef0938b9a9516e4d65995c786f",
+        "compiler_path_replacements": 2053,
+        "compiler_symbol_replacements": 68,
+        "personal_application_identifier_anonymized": true,
+        "company_name_resource_replacements": 1,
+        "executable_sections_preserved": true,
+        "source_provenance": "Early previews were consolidated in preview 14; exact per-preview source snapshots were not retained.",
+        "validation": "Static PE integrity and privacy checks. Anonymized application identity can select a different WebView data directory; use the current release for daily use.",
+        "pe_integrity_check": "passed"
+      },
+      "privacy_check": "passed",
+      "publication_status": "local-only-not-published"
+    },
+    {
+      "preview": 11,
+      "date": "2026-11-06",
+      "summary": "目录解析与额度显示修正的中间构建",
+      "release_tag": null,
+      "source_status": "consolidated-in-preview-14",
+      "exact_source_commit": null,
+      "artifact_status": "intermediate-archived",
+      "files": [
+        {
+          "name": "SwitcherPet-preview-20261106-11-archive.zip",
+          "bytes": 18866541,
+          "sha256": "11fe6261fa1f62315cca7b12e9aea4e5bfcd3db2e4011156509ebd44a0259ff2"
+        }
+      ],
+      "provenance": {
+        "kind": "historical-build-path-redacted",
+        "original_package_sha256": "9a01980d4078dcaa2222da6a55d5ba0d2e1229641ea7b58e62c87645f461bdfc",
+        "original_executable_sha256": "206c7805da545e603dbbf2c39f002995724f8238f6546d3b00ea411353061a7b",
+        "archived_executable_sha256": "bb8242b42e86c6796e9e63b9be7afb65b0060267a0048a36f400c7be5d3897cf",
+        "compiler_path_replacements": 2048,
+        "compiler_symbol_replacements": 68,
+        "personal_application_identifier_anonymized": true,
+        "company_name_resource_replacements": 1,
+        "executable_sections_preserved": true,
+        "source_provenance": "Early previews were consolidated in preview 14; exact per-preview source snapshots were not retained.",
+        "validation": "Static PE integrity and privacy checks. Anonymized application identity can select a different WebView data directory; use the current release for daily use.",
+        "pe_integrity_check": "passed"
+      },
+      "privacy_check": "passed",
+      "publication_status": "local-only-not-published"
+    },
+    {
+      "preview": 12,
+      "date": "2026-11-06",
+      "summary": "Gemini 思考归并、Business 去重和大数额度",
+      "release_tag": null,
+      "source_status": "consolidated-in-preview-14",
+      "exact_source_commit": null,
+      "artifact_status": "privacy-redacted-archive",
+      "files": [
+        {
+          "name": "SwitcherPet-preview-20261106-12-archive.zip",
+          "bytes": 18868911,
+          "sha256": "83f4d25369912f8c066ef4a3b1d8a6ef51539cead0174a3607de0138d29be96a"
+        }
+      ],
+      "provenance": {
+        "kind": "historical-build-path-redacted",
+        "original_package_sha256": "c6e9b0464bea069e5d11209fa733b41c670b2b1c76071240392cb83e51eb775c",
+        "original_executable_sha256": "8333cf06a46be0b4ec04bf039c70901c5978bcb66463bc9b26ef866dd4e51ea3",
+        "archived_executable_sha256": "a3aead343930266eaa04d4ff47d521a09579b98e9781495099b55ad3ef4b0de7",
+        "compiler_path_replacements": 2048,
+        "compiler_symbol_replacements": 68,
+        "personal_application_identifier_anonymized": true,
+        "company_name_resource_replacements": 1,
+        "executable_sections_preserved": true,
+        "source_provenance": "Early previews were consolidated in preview 14; exact per-preview source snapshots were not retained.",
+        "validation": "Static PE integrity and privacy checks. Anonymized application identity can select a different WebView data directory; use the current release for daily use.",
+        "pe_integrity_check": "passed"
+      },
+      "privacy_check": "passed",
+      "publication_status": "local-only-not-published"
+    },
+    {
+      "preview": 13,
+      "date": "2026-11-06",
+      "summary": "API 实际余额与币种显示",
+      "release_tag": null,
+      "source_status": "consolidated-in-preview-14",
+      "exact_source_commit": null,
+      "artifact_status": "privacy-redacted-archive",
+      "files": [
+        {
+          "name": "SwitcherPet-preview-20261106-13-archive.zip",
+          "bytes": 18869409,
+          "sha256": "ae5206ce40577d2f720301488e7ddf413e202dde1b13bb131174202bfbd4a7dd"
+        }
+      ],
+      "provenance": {
+        "kind": "historical-build-path-redacted",
+        "original_package_sha256": "8280f8a7cd76f5589c6318c1417c94c5b8d73bb894af826d9cfc00b78c73a9ae",
+        "original_executable_sha256": "ba0fe480b1021e72dfec683413ca8134cdb5fbb2aeb472404c58d6673cc5df2e",
+        "archived_executable_sha256": "4876b35eb4c53e436e04c741e51f48f4b07f84c846a23dfb8b3e93801c6016a5",
+        "compiler_path_replacements": 2048,
+        "compiler_symbol_replacements": 68,
+        "personal_application_identifier_anonymized": true,
+        "company_name_resource_replacements": 1,
+        "executable_sections_preserved": true,
+        "source_provenance": "Early previews were consolidated in preview 14; exact per-preview source snapshots were not retained.",
+        "validation": "Static PE integrity and privacy checks. Anonymized application identity can select a different WebView data directory; use the current release for daily use.",
+        "pe_integrity_check": "passed"
+      },
+      "privacy_check": "passed",
+      "publication_status": "local-only-not-published"
+    },
+    {
+      "preview": 14,
+      "date": "2026-11-06",
+      "summary": "GPT 原生排序、模型目录合并与发布脱敏",
+      "release_tag": "preview-2026.11.06.14",
+      "source_status": "release-source",
+      "exact_source_commit": "2a9b8e77f28d5e2699db6698bd4a8a5ba3a53244",
+      "artifact_status": "published-preview",
+      "files": [
+        {
+          "name": "SwitcherPet-preview-20261106-14.zip",
+          "bytes": 17153197,
+          "sha256": "912f4aafe60c46b1605a3521da53752fa574f61b2434b57c4d87684abf8e755b"
+        }
+      ]
+    },
+    {
+      "preview": 15,
+      "date": "2026-11-06",
+      "summary": "Astra/Sol 思考等级和订阅/工作区身份",
+      "release_tag": "preview-2026.11.06.15",
+      "source_status": "release-source",
+      "exact_source_commit": "4bf628c31fa5e12f154b0550e3717feb20d7aab6",
+      "artifact_status": "published-preview",
+      "files": [
+        {
+          "name": "SwitcherPet-preview-20261106-15.zip",
+          "bytes": 17163062,
+          "sha256": "565f03491e43dbf7db206a6d77f0d65a32002638adf8b3f5be268beae57a8fd3"
+        }
+      ]
+    },
+    {
+      "preview": 16,
+      "date": "2026-11-06",
+      "summary": "Google 重新授权绑定与工具枚举适配",
+      "release_tag": "preview-2026.11.06.16",
+      "source_status": "release-source",
+      "exact_source_commit": "21758515faf7a4860247928d2516b6e666dfb6e1",
+      "artifact_status": "published-preview",
+      "files": [
+        {
+          "name": "SwitcherPet-preview-20261106-16.zip",
+          "bytes": 17157286,
+          "sha256": "20e9bae45b8c2b85fff9f420c7e1697c9924ad2afa877de06b3fc8bb4a0174c3"
+        }
+      ]
+    },
+    {
+      "preview": 17,
+      "date": "2026-11-06",
+      "summary": "Claude 形象比例修正",
+      "release_tag": "preview-2026.11.06.17",
+      "source_status": "release-source",
+      "exact_source_commit": "e2e8898a67c350035c04830c870f5aad1398a614",
+      "artifact_status": "published-preview",
+      "files": [
+        {
+          "name": "SwitcherPet-preview-20261106-17.zip",
+          "bytes": 17157605,
+          "sha256": "013738b037c6f7a657411caf4152769b9630f13cedc9f1e3d80c53e9b64406d8"
+        }
+      ]
+    },
+    {
+      "preview": 18,
+      "date": "2026-11-06",
+      "summary": "Chat API 同模型切换、捏桌宠刷新和 macOS 菜单栏",
+      "release_tag": "preview-2026.11.06.18",
+      "source_status": "release-source",
+      "exact_source_commit": "2b20ef4a8770cc223ded5498dbef147fc8390803",
+      "artifact_status": "published-preview",
+      "files": [
+        {
+          "name": "SwitcherPet-preview-20261106-18.zip",
+          "bytes": 17261259,
+          "sha256": "526277a4827624d1923eb54b567a8f65ed2369e94645bb4d2af5184904fde21a"
+        },
+        {
+          "name": "SwitcherPet-macOS-arm64-preview18.zip",
+          "bytes": 14234782,
+          "sha256": "5c394f87594baee9dcbc3c27341e7f889ae61a5f97585e10510c7f0cdd3a7532"
+        }
+      ]
+    }
+  ]
+}

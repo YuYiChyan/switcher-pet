@@ -48,3 +48,5 @@ switch-history.jsonl
 profile/
 backups/
 imports/
+__pycache__/
+*.py[cod]
