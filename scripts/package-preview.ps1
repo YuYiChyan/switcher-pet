@@ -25,7 +25,7 @@ Copy-Item -LiteralPath (Join-Path $repo 'public/pets/manifest.json') -Destinatio
 $readme = @'
 Switcher Pet — 自用开源版
 
-preview 17：修正克劳德桌宠的扁平比例，桌面和设置预览同步；保留捏一捏回弹及 preview 16 的 Google 修复。应用标识与编译路径已去除本机用户名；此包不含账号、密钥或个人配置。
+preview 18：捏桌宠会主动刷新额度，并发动作合并；刷新失败保留旧余额。自动来源支持精确同模型的 Responses 和 Chat Completions API，不再因 Chat 协议拒绝勾选；保留克劳德比例及 Google 修复。macOS arm64 另行构建，内置菜单栏用量监控。此 Windows 包不含账号、密钥或个人配置。
 
 API余额在简约模式和详细模式均显示实际金额与币种。详细模式以余额金额为主数字，API额度条也标注金额，余额百分比为次要信息；订阅五小时/周号池继续使用可叠加的等效百分比。
 
