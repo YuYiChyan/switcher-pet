@@ -1,0 +1,7 @@
+/* Claude's pinned upstream idle animation contains a 166×109 character inside
+   the 192×208 canvas. Correct its flattened presentation, not the source bytes.
+   Keep this on the image: the outer button owns the temporary squeeze effect. */
+.pet-art-claude {
+  transform: scaleY(1.75);
+  transform-origin: center;
+}

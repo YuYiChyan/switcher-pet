@@ -3,6 +3,17 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 
+test('Claude presentation correction is shared and isolated from squeeze transforms',()=>{
+  const css=fs.readFileSync('src/components/PetArt.css','utf8');
+  assert.match(css,/\.pet-art-claude\s*\{[^}]*scaleY\(1\.75\)/);
+  assert.doesNotMatch(css,/\.pet-art\s*\{/);
+  for(const file of ['DesktopPet','PetSettings']){
+    const source=fs.readFileSync(`src/components/${file}.tsx`,'utf8');
+    assert.match(source,/import '\.\/PetArt\.css'/);
+    assert.match(source,/<img className=\{`pet-art pet-art-/);
+  }
+});
+
 test('pet capability has events only and cannot invoke credential commands', () => {
   const cap=JSON.parse(fs.readFileSync('src-tauri/capabilities/pet.json','utf8'));
   assert.deepEqual(cap.permissions,['core:event:allow-listen','core:event:allow-unlisten']);

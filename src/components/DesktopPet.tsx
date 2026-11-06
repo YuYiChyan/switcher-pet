@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import './DesktopPet.css';
+import './PetArt.css';
 import { petFamilies as families, PetActivity as Activity, usePetPreferences, usePetAudio } from './petPreferences';
 import { choosePhrase, formatBalance, windowPercent, quotaText, widgetBalances, balancePercent, widgetQuotaWindows } from './petWidget';
 type Quota = { remaining:number; capacity:number; known:number; unknown:number; stale?:number };
@@ -76,7 +77,7 @@ export function DesktopPet() {
       onLostPointerCapture={()=>{cancelHold();setSquash({x:1,y:1,held:false});}}
       onClick={e=>{if(hold.current.fired){hold.current.fired=false;pointer.current=null;return;}if(!pointer.current?.dragged){if(p.pinch){showPhrase();}else toggleMode();void refresh();
         if(e.detail===0){audio.play('press');setTimeout(()=>audio.play('release'),160);}}pointer.current=null;}}>
-      {shown?<img src={`/pets/${shown}.webp`} draggable={false} alt="" />:<span className="pet-generic">✦</span>}
+      {shown?<img className={`pet-art pet-art-${shown}`} src={`/pets/${shown}.webp`} draggable={false} alt="" />:<span className="pet-generic">✦</span>}
     </button>
     <section className={`pet-widget ${open?'is-expanded':''}`} aria-label="桌宠用量">
       <header><button className="pet-model" title={model} aria-label="切换详细模式" aria-expanded={open}

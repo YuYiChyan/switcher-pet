@@ -4,6 +4,7 @@ import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import { petFamilies, PetActivity, usePetAudio, usePetPreferences } from './petPreferences';
 import './PetSettings.css';
+import './PetArt.css';
 
 export function PetSettings() {
   const {preferences:p,save,error}=usePetPreferences();
@@ -25,7 +26,7 @@ export function PetSettings() {
   return <section className="pet-settings">
     <header><h2>桌宠与声音</h2><p>日常只显示桌宠，右键打开设置。所有开关立即保存。</p></header>
     <div className="pet-settings-layout"><aside className="pet-settings-preview">
-      <img src={`/pets/${skin}.webp`} alt={`${skin} 桌宠预览`} />
+      <img className={`pet-art pet-art-${skin}`} src={`/pets/${skin}.webp`} alt={`${skin} 桌宠预览`} />
       <strong>{activity?.model||'Switcher Pet'}</strong>
       
       <button onClick={()=>void invoke('open_pet').catch(e=>setNotice(String(e)))}>显示桌宠</button>

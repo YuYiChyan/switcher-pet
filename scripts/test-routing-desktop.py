@@ -342,6 +342,7 @@ with sync_playwright() as p:
         except Exception as error: assert 'cannot access account secrets' in str(error)
         assert request('relay-current:gemini-synthetic')[0]==200
         expect(pet.locator('.pet-character img')).to_have_attribute('src','/pets/gemini.webp')
+        expect(pet.locator('.pet-character img')).to_have_css('transform','none')
         pet.wait_for_function("() => { const img=document.querySelector('.pet-character img'); return img && img.complete && img.naturalWidth>0; }")
         invoke('probe_source_now',{'id':a})
         assert invoke('get_pet_activity')['model']=='gemini-synthetic'
@@ -702,12 +703,18 @@ with sync_playwright() as p:
         page.get_by_label('固定形象',exact=True).select_option('claude')
         page.get_by_label('按模型切换形象',exact=True).uncheck()
         expect(pet.locator('.pet-character img')).to_have_attribute('src','/pets/claude.webp')
+        art=pet.locator('.pet-character img')
+        expect(art).to_have_css('transform','matrix(1, 0, 0, 1.75, 0, 0)')
+        expect(page.locator('.pet-settings-preview img')).to_have_css('transform','matrix(1, 0, 0, 1.75, 0, 0)')
+        checks.append('Claude-only presentation correction is shared by desktop and settings without modifying licensed artwork')
         box=pet.get_by_role('button',name='查看用量',exact=True).bounding_box()
         pet.mouse.move(box['x']+box['width']/2,box['y']+box['height']/2);pet.mouse.down()
         expect(pet.locator('.pet-character')).to_have_class('pet-character pet-held')
         pet.mouse.move(box['x']+box['width']/2+12,box['y']+box['height']/2+20)
         assert pet.locator('.pet-character').evaluate('(el)=>getComputedStyle(el).transform')!='none'
         pet.mouse.up();expect(pet.locator('.pet-character')).not_to_have_class('pet-character pet-held')
+        expect(pet.locator('.pet-character')).to_have_css('transform','matrix(1, 0, 0, 1, 0, 0)')
+        expect(art).to_have_css('transform','matrix(1, 0, 0, 1.75, 0, 0)')
         prefs=invoke('get_pet_preferences');assert prefs['silent_start'] and prefs['pinch']
         invoke('update_settings',{'settings':settings})
         assert invoke('get_pet_preferences')==prefs
