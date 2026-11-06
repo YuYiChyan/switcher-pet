@@ -88,7 +88,7 @@ pub fn init(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         .build(app)?;
 
     #[cfg(target_os = "macos")]
-    crate::menu_monitor::start(app.clone());
+    start_menu_monitor(app.clone());
     println!("[Tray] 系统托盘已启动");
     Ok(())
 }
@@ -284,4 +284,29 @@ pub fn update_tray_menu(app: &AppHandle) {
     if let Some(tray) = app.tray_by_id("main") {
         let _ = tray.set_tooltip(Some(&tooltip));
     }
+}
+
+#[cfg(target_os = "macos")]
+fn start_menu_monitor(app: tauri::AppHandle) {
+    use tauri::Manager;
+    tauri::async_runtime::spawn(async move {
+        loop {
+            let text = {
+                let state = app.state::<crate::AppState>();
+                let text = state.store.lock().ok().map(|store| {
+                    let prefs = &store.settings.pet_preferences;
+                    let active = crate::pet::get_pet_activity();
+                    let id = if active.account_id.is_empty() { store.current.as_deref().unwrap_or("") } else { &active.account_id };
+                    crate::menu_monitor::title(&crate::pool_api::dashboard(&store), &prefs.menu_scope, prefs.menu_weekly, id)
+                });
+                text
+            };
+            // The store lock must be dropped before calling Cocoa.
+            if let (Some(tray), Some(text)) = (app.tray_by_id("main"), text) {
+                let _ = tray.set_title(Some(&text));
+                let _ = tray.set_tooltip(Some("Switcher Pet · * 表示部分未知或上次记录；右键切换统计范围"));
+            }
+            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+        }
+    });
 }

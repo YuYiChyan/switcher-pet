@@ -359,19 +359,19 @@ with sync_playwright() as p:
         # A real squeeze must fetch fresh balance, not merely repaint cached quota.
         saved_adapters={id:policy_for(id)['balance_adapter'] for id in [b,d]}
         for id in saved_adapters:save_source(id,balance_adapter='off')
-        before=len(reads);usage_remaining=8;usage_delay=.8
+        refresh_read_start=len(reads);usage_remaining=8;usage_delay=.8
         pet.get_by_role('button',name='查看用量',exact=True).click()
         expect(pet.locator('.pet-widget')).to_have_attribute('aria-busy','true')
         reports=page.evaluate("async()=>Promise.all(Array.from({length:3},()=>window.__TAURI_INTERNALS__.invoke('refresh_pet_quota')))")
         assert all(r['busy'] for r in reports),reports
         expect(pet.locator('.pet-widget')).to_have_attribute('aria-busy','false',timeout=10000)
         assert next(r for r in invoke('get_accounts') if r['id']==a)['relay_usage_cache']['remaining']==8
-        assert len(reads[before:])==1 and reads[-1]['path'].endswith('/usage'),reads[before:]
-        usage_delay=0;usage_remaining=12.5;before=len(reads)
+        assert len(reads[refresh_read_start:])==1 and reads[-1]['path'].endswith('/usage'),reads[refresh_read_start:]
+        usage_delay=0;usage_remaining=12.5;refresh_read_start=len(reads)
         pet.get_by_role('button',name='查看用量',exact=True).click()
         expect(pet.locator('.pet-widget')).to_have_attribute('aria-busy','false',timeout=10000)
         assert next(r for r in invoke('get_accounts') if r['id']==a)['relay_usage_cache']['remaining']==12.5
-        assert len(reads[before:])==1
+        assert len(reads[refresh_read_start:])==1
         usage_failure=True
         pet.get_by_role('button',name='查看用量',exact=True).click()
         expect(pet.locator('.pet-widget')).to_have_attribute('aria-busy','false',timeout=10000)

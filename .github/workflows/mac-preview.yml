@@ -1,4 +1,4 @@
-name: Self-use macOS universal preview
+name: Self-use macOS Apple Silicon preview
 on:
   workflow_dispatch:
 permissions:
@@ -15,25 +15,25 @@ jobs:
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
+          targets: aarch64-apple-darwin
       - name: Install dependencies
         run: npm ci
       - name: Unit tests
         run: |
           node --test scripts/*.test.mjs
           cargo test --locked --manifest-path tests/compat-harness/Cargo.toml
-      - name: Build universal application
+      - name: Build Apple Silicon application
         env:
           APPLE_SIGNING_IDENTITY: "-"
         run: |
           export RUSTFLAGS="--remap-path-prefix=$GITHUB_WORKSPACE=/src --remap-path-prefix=$HOME=/build-user"
-          npx tauri build --target universal-apple-darwin --bundles app -- --locked
+          npx tauri build --target aarch64-apple-darwin --bundles app -- --locked
       - name: Verify and package
         run: |
-          APP="src-tauri/target/universal-apple-darwin/release/bundle/macos/Switcher Pet.app"
+          APP="src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Switcher Pet.app"
           BIN="$APP/Contents/MacOS/switcher-pet"
           test -x "$BIN"
-          lipo -verify_arch arm64 x86_64 "$BIN"
+          test "$(lipo -archs "$BIN")" = "arm64"
           codesign --verify --deep --strict --verbose=2 "$APP"
           # Isolated smoke launch; no account import, proxy, or production credentials.
           "$BIN" --validation > mac-smoke.log 2>&1 &
@@ -43,15 +43,15 @@ jobs:
           kill "$PID"
           wait "$PID" || true
           mkdir -p release
-          ditto -c -k --sequesterRsrc --keepParent "$APP" release/SwitcherPet-macOS-universal.app.zip
+          ditto -c -k --sequesterRsrc --keepParent "$APP" release/SwitcherPet-macOS-arm64.app.zip
           cp README.macOS.md release/
           cp LICENSE release/LICENSE-upstream.txt
           cp public/pets/LICENSE-CC-BY-NC-4.0.txt release/LICENSE-pet-assets.txt
           cp public/pets/NOTICE.md release/NOTICE-pet-assets.md
-          (cd release && shasum -a 256 SwitcherPet-macOS-universal.app.zip > SHA256.txt)
+          (cd release && shasum -a 256 SwitcherPet-macOS-arm64.app.zip > SHA256.txt)
       - uses: actions/upload-artifact@v4
         with:
-          name: SwitcherPet-macOS-universal
+          name: SwitcherPet-macOS-arm64
           path: release/*
           if-no-files-found: error
       - uses: actions/upload-artifact@v4

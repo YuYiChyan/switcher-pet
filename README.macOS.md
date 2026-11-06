@@ -2,8 +2,8 @@
 
 ## 安装和启动
 
-解压 `SwitcherPet-macOS-universal.app.zip`，将 `Switcher Pet.app` 放入自己的
-Applications 文件夹。通用二进制包含 Apple Silicon 和 Intel 两种架构。
+解压 `SwitcherPet-macOS-arm64.app.zip`，将 `Switcher Pet.app` 放入自己的
+Applications 文件夹。本版面向 Apple Silicon Mac，仅构建 arm64，不提供 Intel 包。
 这是自用预览包，采用 ad-hoc 本地签名，**没有 Apple Developer ID 签名及公证**。
 首次运行可能受到系统安全提示限制；请通过 macOS 针对这个应用的“仍要打开”流程处理，
 不要关闭全系统的安全检查。
@@ -30,6 +30,6 @@ Applications 文件夹。通用二进制包含 Apple Silicon 和 Intel 两种架
 
 ## 验证边界
 
-发布构建检查通用架构、ad-hoc 签名、隔离启动和单元测试。
+发布构建检查 arm64 架构、ad-hoc 签名、隔离启动和单元测试。
 这些检查不代表已经在你的 Mac 上验证登录、真实账户网络、声音或桌宠交互。
 原始账号密钥、个人配置和本地记录均不随包发布。

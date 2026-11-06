@@ -1,4 +1,4 @@
-//! User-initiated quota refresh. Never changes routing, credentials or auth files.
+//! User-initiated quota refresh. Preserves routing and existing token ownership.
 use crate::{account::AccountStore, AppState};
 use futures_util::{stream, StreamExt};
 use tauri::{Emitter, Manager};
