@@ -881,6 +881,9 @@ impl AccountStore {
         if store.ensure_current_antigravity_account() {
             let _ = store.save();
         }
+        if store.reconcile_google_reauthorization() {
+            let _ = store.save();
+        }
         if crate::relay_catalog::ensure_currents(&mut store) {
             let _ = store.save();
         }
@@ -918,6 +921,37 @@ impl AccountStore {
         }
         self.settings.current_antigravity_account_id = Some(id.to_string());
         Ok(())
+    }
+
+    /// Repair old imports pinned before the same identity logged in again.
+    /// Preserve records/credentials, unrelated sources and explicit worker bindings.
+    fn reconcile_google_reauthorization(&mut self) -> bool {
+        let mut replacements = HashMap::new();
+        for old in self.accounts.values().filter(|a| a.kind == AccountKind::Legacy && a.is_antigravity_oauth()) {
+            let new = self.accounts.values().filter(|a| a.kind == AccountKind::AntigravityOauth
+                && a.created_at > old.created_at && !a.is_banned && !a.is_logged_out && !a.is_token_invalid
+                && crate::antigravity::identity::supersedes(&old.auth_json, &a.auth_json, Utc::now()))
+                .max_by_key(|a| a.created_at);
+            if let Some(new) = new { replacements.insert(old.id.clone(), new.id.clone()); }
+        }
+        let mut changed = false;
+        for id in self.settings.current_model_sources.values_mut()
+            .chain(self.settings.current_google_accounts.values_mut())
+            .chain(self.settings.current_antigravity_account_id.iter_mut()) {
+            if let Some(new) = replacements.get(id) { *id = new.clone(); changed = true; }
+        }
+        for policy in self.settings.model_route_policies.values_mut() {
+            let mut policy_changed = false;
+            for id in &mut policy.allowed_sources {
+                if let Some(new) = replacements.get(id) { *id = new.clone(); policy_changed = true; }
+            }
+            if policy_changed {
+                let mut seen = std::collections::HashSet::new();
+                policy.allowed_sources.retain(|id| seen.insert(id.clone()));
+                changed = true;
+            }
+        }
+        changed
     }
 
     /// 保证 Google 当前号指向一个现存的 Antigravity 账号；升级旧配置时自动补首个号。
@@ -1556,6 +1590,19 @@ impl AccountStore {
         auth_json: serde_json::Value,
         notes: Option<String>,
     ) -> Account {
+        // Login again must update the identity in place so model/worker routes
+        // keep their stable IDs, rather than retaining an expired duplicate.
+        if let Some(existing) = self.accounts.values_mut()
+            .filter(|a| a.is_antigravity_oauth() && crate::antigravity::identity::same_identity(&a.auth_json, &auth_json))
+            .max_by_key(|a| a.created_at) {
+            existing.refresh_token = Self::extract_refresh_token(&auth_json);
+            existing.auth_json = auth_json;
+            existing.kind = AccountKind::AntigravityOauth;
+            existing.is_banned = false;
+            existing.is_logged_out = false;
+            existing.is_token_invalid = false;
+            return existing.clone();
+        }
         let id = uuid::Uuid::new_v4().to_string();
         let refresh_token = Self::extract_refresh_token(&auth_json);
         let account = Account {

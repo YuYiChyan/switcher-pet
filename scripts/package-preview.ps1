@@ -25,7 +25,7 @@ Copy-Item -LiteralPath (Join-Path $repo 'public/pets/manifest.json') -Destinatio
 $readme = @'
 Switcher Pet — 自用开源版
 
-preview 15：恢复 Astra / Sol 原生思考等级，保留 Luna；来源池区分订阅、登录账号、工作区与席位，并标注缓存状态。应用标识与编译路径已去除本机用户名；此包不含账号、密钥或个人配置。
+preview 16：修复 Google 重新授权后旧导入记录仍被模型绑定的问题；内置 DSH 风格的 Google 工具枚举兼容，保留模型和思考等级，不静默降级。应用标识与编译路径已去除本机用户名；此包不含账号、密钥或个人配置。
 
 API余额在简约模式和详细模式均显示实际金额与币种。详细模式以余额金额为主数字，API额度条也标注金额，余额百分比为次要信息；订阅五小时/周号池继续使用可叠加的等效百分比。
 

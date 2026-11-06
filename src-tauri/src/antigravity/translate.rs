@@ -444,6 +444,16 @@ fn sanitize_schema_node(value: Value, property_map: bool) -> Value {
                 "encrypted",
             ];
             object.retain(|key, _| !UNSUPPORTED.contains(&key.as_str()) && !key.starts_with("x-"));
+            // Google Schema.enum is repeated string even for boolean schemas.
+            // Keep the property type and actual tool arguments boolean. Do not
+            // recursively rewrite user messages or literal example objects.
+            if let Some(Value::Array(values)) = object.get_mut("enum") {
+                for value in values {
+                    if value.is_boolean() || value.is_number() {
+                        *value = Value::String(value.to_string());
+                    }
+                }
+            }
             for (key, value) in object.iter_mut() {
                 *value = sanitize_schema_node(std::mem::take(value), key == "properties");
             }
@@ -741,6 +751,22 @@ pub fn antigravity_response_to_codex(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn google_enum_strings_preserve_types_and_property_names() {
+        let cleaned = sanitize_schema_value(json!({
+            "type":"object","properties":{
+                "enum":{"type":"boolean","enum":[true,false]},
+                "count":{"type":"integer","enum":[1,2]},
+                "nested":{"type":"array","items":{"type":"string","enum":["a","b"]}}
+            }
+        }));
+        assert_eq!(cleaned["properties"]["enum"]["type"], "boolean");
+        assert_eq!(cleaned["properties"]["enum"]["enum"], json!(["true","false"]));
+        assert_eq!(cleaned["properties"]["count"]["type"], "integer");
+        assert_eq!(cleaned["properties"]["count"]["enum"], json!(["1","2"]));
+        assert_eq!(cleaned["properties"]["nested"]["items"]["enum"], json!(["a","b"]));
+    }
 
     #[test]
     fn effort_reaches_gemini_level_and_claude_budget() {

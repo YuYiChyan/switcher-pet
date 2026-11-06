@@ -1,5 +1,7 @@
 #[path = "../../src-tauri/src/antigravity/models.rs"]
 pub mod models;
+#[path = "../../src-tauri/src/antigravity/identity.rs"]
+pub mod identity;
 #[path = "../../src-tauri/src/antigravity/tools.rs"]
 pub mod tools;
 #[path = "../../src-tauri/src/antigravity/translate.rs"]
