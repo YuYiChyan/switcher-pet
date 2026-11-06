@@ -149,7 +149,7 @@ Windows 桌面回归入口为 `scripts/smoke-desktop.ps1 -RoutingTests`，使用
 
 从独立运行基础，到统一模型路由、桌宠与额度池，再到 Google 适配和 macOS 菜单栏，完整变化见 [VERSION_HISTORY.md](VERSION_HISTORY.md)。
 
-preview 1–13 的历史构建目前仅在本地准备归档，尚未上传；preview 14–18 分别保留 GitHub 发布记录。preview 7 以开发记录保存，preview 11 标记为中间构建。早期源码在 preview 14 合并入库，历史包的校验值、脱敏过程与源码对应关系见 [归档说明](release-history/README.md)。日常使用选择 preview 18。
+preview 1–13 的脱敏历史构建见 [早期版本归档](https://github.com/YuYiChyan/switcher-pet/releases/tag/archive-previews-1-13)；preview 14–18 分别保留 GitHub 发布记录。preview 7 以开发记录保存，preview 11 标记为中间构建。早期源码在 preview 14 合并入库，历史包的校验值、脱敏过程与源码对应关系见 [归档说明](release-history/README.md)。日常使用选择 preview 18。
 
 ## 贡献与许可
 

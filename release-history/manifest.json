@@ -5,7 +5,7 @@
       "preview": 1,
       "date": "2026-11-06",
       "summary": "独立标识、数据路径隔离与 Windows 便携启动",
-      "release_tag": null,
+      "release_tag": "archive-previews-1-13",
       "source_status": "consolidated-in-preview-14",
       "exact_source_commit": null,
       "artifact_status": "privacy-redacted-archive",
@@ -31,13 +31,13 @@
         "pe_integrity_check": "passed"
       },
       "privacy_check": "passed",
-      "publication_status": "local-only-not-published"
+      "publication_status": "published"
     },
     {
       "preview": 2,
       "date": "2026-11-06",
       "summary": "模型路由、协议兼容、账号和子任务绑定",
-      "release_tag": null,
+      "release_tag": "archive-previews-1-13",
       "source_status": "consolidated-in-preview-14",
       "exact_source_commit": null,
       "artifact_status": "privacy-redacted-archive",
@@ -63,13 +63,13 @@
         "pe_integrity_check": "passed"
       },
       "privacy_check": "passed",
-      "publication_status": "local-only-not-published"
+      "publication_status": "published"
     },
     {
       "preview": 3,
       "date": "2026-11-06",
       "summary": "模型开关、额度池、探针与桌宠入口",
-      "release_tag": null,
+      "release_tag": "archive-previews-1-13",
       "source_status": "consolidated-in-preview-14",
       "exact_source_commit": null,
       "artifact_status": "privacy-redacted-archive",
@@ -95,13 +95,13 @@
         "pe_integrity_check": "passed"
       },
       "privacy_check": "passed",
-      "publication_status": "local-only-not-published"
+      "publication_status": "published"
     },
     {
       "preview": 4,
       "date": "2026-11-06",
       "summary": "导入信息恢复、探针和静默启动",
-      "release_tag": null,
+      "release_tag": "archive-previews-1-13",
       "source_status": "consolidated-in-preview-14",
       "exact_source_commit": null,
       "artifact_status": "privacy-redacted-archive",
@@ -127,13 +127,13 @@
         "pe_integrity_check": "passed"
       },
       "privacy_check": "passed",
-      "publication_status": "local-only-not-published"
+      "publication_status": "published"
     },
     {
       "preview": 5,
       "date": "2026-11-06",
       "summary": "捏一捏、音效与桌面交互修正",
-      "release_tag": null,
+      "release_tag": "archive-previews-1-13",
       "source_status": "consolidated-in-preview-14",
       "exact_source_commit": null,
       "artifact_status": "privacy-redacted-archive",
@@ -159,13 +159,13 @@
         "pe_integrity_check": "passed"
       },
       "privacy_check": "passed",
-      "publication_status": "local-only-not-published"
+      "publication_status": "published"
     },
     {
       "preview": 6,
       "date": "2026-11-06",
       "summary": "简洁余额组件、随机气泡与 Google 工具转换",
-      "release_tag": null,
+      "release_tag": "archive-previews-1-13",
       "source_status": "consolidated-in-preview-14",
       "exact_source_commit": null,
       "artifact_status": "privacy-redacted-archive",
@@ -191,24 +191,24 @@
         "pe_integrity_check": "passed"
       },
       "privacy_check": "passed",
-      "publication_status": "local-only-not-published"
+      "publication_status": "published"
     },
     {
       "preview": 7,
       "date": "2026-11-06",
       "summary": "默认代理端口统一为 18080",
-      "release_tag": null,
+      "release_tag": "archive-previews-1-13",
       "source_status": "consolidated-in-preview-14",
       "exact_source_commit": null,
       "artifact_status": "development-record",
       "files": [],
-      "publication_status": "local-only-not-published"
+      "publication_status": "published"
     },
     {
       "preview": 8,
       "date": "2026-11-06",
       "summary": "长按切换视图、星空额度条和统一账号来源",
-      "release_tag": null,
+      "release_tag": "archive-previews-1-13",
       "source_status": "consolidated-in-preview-14",
       "exact_source_commit": null,
       "artifact_status": "privacy-redacted-archive",
@@ -234,13 +234,13 @@
         "pe_integrity_check": "passed"
       },
       "privacy_check": "passed",
-      "publication_status": "local-only-not-published"
+      "publication_status": "published"
     },
     {
       "preview": 9,
       "date": "2026-11-06",
       "summary": "五小时受限池与模型目录刷新",
-      "release_tag": null,
+      "release_tag": "archive-previews-1-13",
       "source_status": "consolidated-in-preview-14",
       "exact_source_commit": null,
       "artifact_status": "privacy-redacted-archive",
@@ -266,13 +266,13 @@
         "pe_integrity_check": "passed"
       },
       "privacy_check": "passed",
-      "publication_status": "local-only-not-published"
+      "publication_status": "published"
     },
     {
       "preview": 10,
       "date": "2026-11-06",
       "summary": "原生/API 逻辑模型合并及统一路由选择器",
-      "release_tag": null,
+      "release_tag": "archive-previews-1-13",
       "source_status": "consolidated-in-preview-14",
       "exact_source_commit": null,
       "artifact_status": "privacy-redacted-archive",
@@ -298,13 +298,13 @@
         "pe_integrity_check": "passed"
       },
       "privacy_check": "passed",
-      "publication_status": "local-only-not-published"
+      "publication_status": "published"
     },
     {
       "preview": 11,
       "date": "2026-11-06",
       "summary": "目录解析与额度显示修正的中间构建",
-      "release_tag": null,
+      "release_tag": "archive-previews-1-13",
       "source_status": "consolidated-in-preview-14",
       "exact_source_commit": null,
       "artifact_status": "intermediate-archived",
@@ -330,13 +330,13 @@
         "pe_integrity_check": "passed"
       },
       "privacy_check": "passed",
-      "publication_status": "local-only-not-published"
+      "publication_status": "published"
     },
     {
       "preview": 12,
       "date": "2026-11-06",
       "summary": "Gemini 思考归并、Business 去重和大数额度",
-      "release_tag": null,
+      "release_tag": "archive-previews-1-13",
       "source_status": "consolidated-in-preview-14",
       "exact_source_commit": null,
       "artifact_status": "privacy-redacted-archive",
@@ -362,13 +362,13 @@
         "pe_integrity_check": "passed"
       },
       "privacy_check": "passed",
-      "publication_status": "local-only-not-published"
+      "publication_status": "published"
     },
     {
       "preview": 13,
       "date": "2026-11-06",
       "summary": "API 实际余额与币种显示",
-      "release_tag": null,
+      "release_tag": "archive-previews-1-13",
       "source_status": "consolidated-in-preview-14",
       "exact_source_commit": null,
       "artifact_status": "privacy-redacted-archive",
@@ -394,7 +394,7 @@
         "pe_integrity_check": "passed"
       },
       "privacy_check": "passed",
-      "publication_status": "local-only-not-published"
+      "publication_status": "published"
     },
     {
       "preview": 14,

@@ -1,6 +1,6 @@
 # Switcher Pet 版本记录
 
-这些编号是独立 fork 的便携预览修订号，底层应用版本沿用上游 0.7.21。所有记录日期为 2026-11-06。preview 14–18 已发布到 GitHub Releases；经过脱敏的早期构建目前仅在本地，尚未上传；完整清单见 [版本归档](release-history/README.md)。
+这些编号是独立 fork 的便携预览修订号，底层应用版本沿用上游 0.7.21。所有记录日期为 2026-11-06。preview 14–18 和经过脱敏的早期构建均已发布到 GitHub Releases；完整清单见 [版本归档](release-history/README.md)。
 
 | 修订 | 内容 | 状态 |
 | --- | --- | --- |
