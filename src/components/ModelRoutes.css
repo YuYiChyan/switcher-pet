@@ -34,4 +34,8 @@
 .model-routes td label { display:flex; gap:9px; align-items:center; overflow-wrap:anywhere; }
 .model-routes-empty { min-height:270px; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; border-top:1px solid #cbdce8; }
 .model-routes-error { color:#9e2424; white-space:pre-wrap; }
+.model-source-identity { display:flex; flex-direction:column; gap:5px; margin:9px 0 0 26px; color:#405c73; overflow-wrap:anywhere; }
+.model-source-badges { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.model-source-badges>* { background:#dceafb; color:#294e78; padding:3px 7px; border-radius:5px; font-size:12px; }
+.model-source-badges>strong { background:#d8efeb; color:#14665e; }
 @media(max-width:900px) { .model-routes-heading { flex-direction:column; } .model-routes-workspace { grid-template-columns:1fr; } .model-routes aside { border-right:0; padding-right:0; } .model-routes article { padding-left:0; } }

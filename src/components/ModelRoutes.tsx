@@ -6,7 +6,15 @@ import { watchModelRoutes } from './modelRoutesRefresh';
 import './ModelRoutes.css';
 
 type Policy = { enabled: boolean; visible: boolean; auto_switch: boolean; allowed_sources: string[] };
-type Model = { model: string; slug: string; current: string; policy: Policy; sources: { id: string; name: string; protocol: string; upstream_model: string; automatic_supported: boolean }[] };
+type Identity = { plan_label: string; scope: string; email: string | null; workspace_name: string | null;
+  workspace_ref: string | null; member_ref: string; status: string; subscription_until: string | null;
+  checked_at: string | null; stale: boolean };
+type Model = { model: string; slug: string; current: string; policy: Policy; sources: {
+  id: string; name: string; protocol: string; upstream_model: string; automatic_supported: boolean;
+  identity?: Identity; authorization_status?: string; menu_label?: string }[] };
+const localTime = (value: string) => {
+  const date = new Date(value); return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+};
 
 export function ModelRoutes({ accounts, onAddSource }: { accounts: Account[]; onAddSource: () => void }) {
   const [models, setModels] = useState<Model[]>([]);
@@ -60,7 +68,7 @@ export function ModelRoutes({ accounts, onAddSource }: { accounts: Account[]; on
         <div className="model-routes-list" aria-label="模型列表">
           {models.filter(m => m.model.toLowerCase().includes(filter.toLowerCase())).map(m =>
             <button key={m.model} aria-pressed={m.model === model?.model} onClick={() => setSelected(m.model)}>
-              <strong>{m.model}</strong><span>{!m.policy.enabled ? '已禁用' : !m.policy.visible ? '目录隐藏' : m.sources.find(s => s.id === m.current)?.name ?? '—'}</span>
+              <strong>{m.model}</strong><span>{!m.policy.enabled ? '已禁用' : !m.policy.visible ? '目录隐藏' : m.sources.find(s => s.id === m.current)?.menu_label ?? m.sources.find(s => s.id === m.current)?.name ?? '—'}</span>
             </button>)}
         </div>
       </aside>
@@ -79,7 +87,16 @@ export function ModelRoutes({ accounts, onAddSource }: { accounts: Account[]; on
           <table><thead><tr><th>当前来源</th><th>协议</th><th>允许自动切换</th></tr></thead><tbody>
             {model.sources.map(source => <tr key={source.id}>
               <td><label><input type="radio" name="model-source" checked={model.current === source.id}
-                onChange={() => run(() => invoke('set_model_source', { id: source.id, model: model.model }))} />{source.name}</label></td>
+                onChange={() => run(() => invoke('set_model_source', { id: source.id, model: model.model }))} />{source.name}</label>
+                {source.identity ? <div className="model-source-identity">
+                  <div className="model-source-badges"><strong>{source.identity.plan_label}</strong>
+                    <span>{source.identity.scope}</span><span>{source.identity.status}</span></div>
+                  <small>登录账号：{source.identity.email ?? '未返回邮箱'} · 席位 {source.identity.member_ref}</small>
+                  <small>{source.identity.scope}：{source.identity.workspace_name ? `${source.identity.workspace_name} · ` : ''}{source.identity.workspace_ref ?? '标识未返回'}</small>
+                  {source.identity.subscription_until && <small>订阅日期至 {localTime(source.identity.subscription_until)}</small>}
+                  <small>{source.authorization_status} · {source.identity.checked_at ? `最近查询 ${localTime(source.identity.checked_at)}` : '尚无查询时间'}{source.identity.stale ? '（缓存待更新）' : ''}</small>
+                </div> : source.protocol === 'openai_key' ? <small className="model-source-identity">OpenAI API · 按量计费，不属于 ChatGPT 订阅</small> : null}
+              </td>
               <td>{source.protocol}{source.upstream_model !== model.model && <small style={{ display: 'block' }}>→ {source.upstream_model}</small>}</td>
               <td><input type="checkbox" aria-label={`${source.name} auto`} disabled={!source.automatic_supported}
                 checked={model.policy.allowed_sources.includes(source.id)} onChange={e => policy({ ...model.policy,
@@ -88,6 +105,7 @@ export function ModelRoutes({ accounts, onAddSource }: { accounts: Account[]; on
           </tbody></table>
         </fieldset>
         <p className="model-route-note">未勾选的来源不会被自动使用。没有可用来源时保留错误，不降级到其他模型。</p>
+        {model.sources.some(s => s.identity) && <p className="model-route-note">同一登录账号可有不同个人空间／工作区；同一工作区也可有多个席位。订阅状态来自缓存记录，授权失效不等于订阅到期。</p>}
       </article>}
     </div>}
   </section>;

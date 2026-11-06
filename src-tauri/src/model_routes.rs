@@ -11,14 +11,21 @@ pub fn native_models()->Vec<String> {
     native_catalog().iter().filter_map(|m|m["slug"].as_str().or(m["id"].as_str())).map(str::to_owned).collect()
 }
 pub fn native_catalog()->Vec<serde_json::Value> {
-    let mut models=Vec::new();
-    let mut seen=std::collections::BTreeSet::new();
+    let mut models:Vec<serde_json::Value>=Vec::new();
     for path in crate::app_paths::readonly_model_catalogs() {
         if !std::fs::metadata(&path).is_ok_and(|m|m.len()<16*1024*1024){continue;}
         let Some(value)=std::fs::read(path).ok().and_then(|b|serde_json::from_slice::<serde_json::Value>(&b).ok()) else{continue;};
-        models.extend(value["models"].as_array().into_iter().flatten().filter(|row|row["slug"].as_str().or(row["id"].as_str()).is_some_and(|m|
-            ((m.starts_with("gpt-")&&!m.starts_with("gpt-oss-"))||m.starts_with("codex-")||["o1","o3","o4-mini"].contains(&m))&&seen.insert(m.to_string()))).cloned());
+        for row in value["models"].as_array().into_iter().flatten() {
+            let Some(id)=row["slug"].as_str().or(row["id"].as_str()) else{continue;};
+            if !((id.starts_with("gpt-")&&!id.starts_with("gpt-oss-"))||id.starts_with("codex-")||["o1","o3","o4-mini"].contains(&id)){continue;}
+            if let Some(old)=models.iter_mut().find(|m|m["slug"].as_str().or(m["id"].as_str())==Some(id)) {
+                if !old["supported_reasoning_levels"].as_array().is_some_and(|a|!a.is_empty()){
+                    crate::native_metadata::merge_reasoning(old,row);
+                }
+            } else {models.push(row.clone());}
+        }
     }
+    for row in &mut models {crate::native_metadata::repair_empty_reasoning(row);}
     // The desktop and CLI caches can each contain only part of the native list.
     // Merge their IDs, then match native priority with stable ties.
     models.sort_by_key(|m|m["priority"].as_i64().unwrap_or(i64::MAX));
@@ -85,14 +92,15 @@ pub fn unify_catalog(store:&crate::account::AccountStore, entries:&mut Vec<serde
                 .cloned().unwrap_or_else(||serde_json::json!({"slug":logical,"visibility":"list","supported_in_api":true}))
         };
         if !api_format {
-            if relay.is_some() {
-                if let Some(metadata)=native.iter().find(|e|e["slug"].as_str().or(e["id"].as_str())==Some(logical)) {
-                    for key in ["supported_reasoning_levels","default_reasoning_level"] {
-                        if let Some(value)=metadata.get(key){entry[key]=value.clone();}
-                    }
-                }
+            // Prefer fresh nonempty upstream capabilities, then native cache.
+            // Source protocol affects transport, never the logical model's picker.
+            if let Some(metadata)=original.iter().chain(native.iter()).find(|e|
+                e["slug"].as_str().or(e["id"].as_str())==Some(logical) &&
+                e["supported_reasoning_levels"].as_array().is_some_and(|a|!a.is_empty())) {
+                crate::native_metadata::merge_reasoning(&mut entry,metadata);
             }
             entry["slug"]=serde_json::json!(logical);
+            crate::native_metadata::repair_empty_reasoning(&mut entry);
             entry["display_name"]=serde_json::json!(logical);
             entry["description"]=serde_json::json!(logical);
             entry["visibility"]=serde_json::json!("list");
@@ -181,6 +189,18 @@ pub fn groups(store:&crate::account::AccountStore)->Vec<serde_json::Value> {
         for source in group["sources"].as_array_mut().into_iter().flatten() {
             source["upstream_model"]=serde_json::json!(source["id"].as_str()
                 .and_then(|id|relay_catalog::configured_on_account(store,model,id).map(|m|m.upstream).or_else(||google_upstream(store,id,model,None))).unwrap_or_else(||model.clone()));
+            if let Some(account)=source["id"].as_str().and_then(|id|store.accounts.get(id)) {
+                if account.is_chatgpt_oauth() {
+                    let quota=account.cached_quota.as_ref().and_then(|q|serde_json::to_value(q).ok());
+                    let identity=crate::source_identity::describe(&account.auth_json,quota.as_ref(),&account.id,chrono::Utc::now().timestamp());
+                    source["menu_label"]=serde_json::json!(format!("{} · {} · {}",account.name,
+                        identity["context_label"].as_str().unwrap_or_default(),identity["status"].as_str().unwrap_or_default()));
+                    source["identity"]=identity;
+                    source["authorization_status"]=serde_json::json!(if account.is_banned{"账号受限"}else if account.is_logged_out{"已登出"}else if account.is_token_invalid{"需重新登录"}else{"已保存授权"});
+                } else if account.is_openai_account() {
+                    source["menu_label"]=serde_json::json!(format!("{} · OpenAI API · 按量计费",account.name));
+                }
+            }
         }
     }
     let mut ordered=Vec::new();for model in native{if let Some(group)=merged.remove(&model){ordered.push(group);}}

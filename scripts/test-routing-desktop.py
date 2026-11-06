@@ -500,7 +500,11 @@ with sync_playwright() as p:
         # Native subscription/API accounts participate in the same model selector.
         native_models=['gpt-native-test','gpt-native-on','gpt-native-off']
         catalog=Path.home()/'.switcher-pet/validation/profile/.codex/models_cache.json'
-        catalog.parent.mkdir(parents=True,exist_ok=True);catalog.write_text(json.dumps({'models':[{'slug':m,'priority':native_models.index(m)+1} for m in reversed(native_models)]}),encoding='utf-8')
+        reasoning_models=['gpt-6-astra','gpt-6-sol','gpt-6.1-sol']
+        catalog.parent.mkdir(parents=True,exist_ok=True);catalog.write_text(json.dumps({'models':
+            [{'slug':m,'priority':native_models.index(m)+1} for m in reversed(native_models)] +
+            [{'slug':m,'priority':20+i,'supported_reasoning_levels':[]} for i,m in enumerate(reasoning_models)] +
+            [{'slug':'gpt-6-luna','priority':24,'default_reasoning_level':'medium','supported_reasoning_levels':[{'effort':e,'description':e} for e in ['low','medium','high','xhigh','max']]}]}),encoding='utf-8')
         # A partial desktop cache must not hide GPTs found only in the CLI cache.
         catalog.with_name('models_cache.codex_work_desktop.json').write_text(json.dumps({'models':[{'slug':native_models[1],'priority':2}]}),encoding='utf-8')
         native_ids=[]
@@ -509,8 +513,12 @@ with sync_playwright() as p:
                 auth_json={'tokens':{'access_token':'synthetic-'+source,'refresh_token':'synthetic-refresh-'+source,'account_id':'synthetic-identity-'+source},
                     'validation_endpoint':f'http://127.0.0.1:{server.server_port}/{source}'},
                 relay_base_url=None,relay_model_map={},relay_model_catalog=[],is_token_invalid=False,cached_quota=None)
-            if kind=='chatgpt_oauth':account['cached_quota']={'five_hour_left':25,'five_hour_reset':'','weekly_left':75,'weekly_reset':'','plan_type':'plus','is_valid_for_cli':True,
-                'primary_window_seconds':18000,'secondary_window_seconds':604800,'updated_at':(datetime.datetime.now(datetime.timezone.utc)-datetime.timedelta(hours=2)).isoformat()}
+            if kind=='chatgpt_oauth':
+                account['cached_quota']={'five_hour_left':25,'five_hour_reset':'','weekly_left':75,'weekly_reset':'','plan_type':'plus','is_valid_for_cli':True,
+                    'primary_window_seconds':18000,'secondary_window_seconds':604800,'updated_at':(datetime.datetime.now(datetime.timezone.utc)-datetime.timedelta(hours=2)).isoformat()}
+                claims={'email':'synthetic@example.invalid','https://api.openai.com/auth':{'chatgpt_account_id':'synthetic-identity-'+source,
+                    'chatgpt_user_id':'synthetic-user','chatgpt_plan_type':'plus','chatgpt_subscription_active_until':'2099-01-01T00:00:00Z'}}
+                account['auth_json']['tokens']['id_token']='test.'+base64.urlsafe_b64encode(json.dumps(claims).encode()).decode().rstrip('=')+'.test'
             content=base64.b64encode(json.dumps({'accounts':{account['id']:account}}).encode()).decode()
             invoke('bulk_import_accounts',{'files':[{'filename':'accounts.json','content_b64':content}]})
             native_ids.append(next(r['id'] for r in invoke('get_accounts') if r['name']==account['name']))
@@ -518,6 +526,13 @@ with sync_playwright() as p:
         groups=invoke('get_model_routes')
         assert [g['model'] for g in groups[:3]]==native_models
         assert {s['protocol'] for s in groups[0]['sources']}=={'openai_subscription','openai_key'}
+        subscription=next(s for s in groups[0]['sources'] if s['id']==oa)
+        assert subscription['identity']['plan_label']=='Plus'
+        assert subscription['identity']['scope']=='个人空间'
+        assert subscription['identity']['status']=='订阅期内'
+        assert subscription['identity']['email']=='synthetic@example.invalid'
+        assert 'Plus' in subscription['menu_label']
+        assert all(secret not in json.dumps(groups) for secret in ['synthetic-refresh-oa','test.eyJ','access_token'])
         global_current=invoke('get_current_account_id')
         for m in native_models:invoke('set_model_source',{'id':oa,'model':m})
         assert request('gpt-native-off')[0]==429
@@ -541,7 +556,8 @@ with sync_playwright() as p:
         # A provider's explicit alias must join the native selector, not become
         # a disconnected API-only entry. Exercise the installed EXE, not a mock resolver.
         alias_source=invoke('add_relay_account',{'name':'Synthetic mapped native','baseUrl':f'http://127.0.0.1:{server.server_port}/mapped/v1',
-            'apiKey':'synthetic-mapped','modelMap':{'gpt-native-test':'provider/gpt-native-test','gpt-native-on':'provider/gpt-native-on'},'relayProtocol':'responses'})['id']
+            'apiKey':'synthetic-mapped','modelMap':{'gpt-native-test':'provider/gpt-native-test','gpt-native-on':'provider/gpt-native-on',
+                **{m:'provider/'+m for m in reasoning_models}},'relayProtocol':'responses'})['id']
         disable_probe(alias_source)
         group=next(g for g in invoke('get_model_routes') if g['model']=='gpt-native-test')
         assert alias_source in [s['id'] for s in group['sources']], 'native selector lost the API model-map key'
@@ -550,6 +566,19 @@ with sync_playwright() as p:
         page.get_by_label('Synthetic mapped native',exact=True).click()
         expect(page.get_by_label('Synthetic mapped native',exact=True)).to_be_checked()
         expect(page.locator('.model-routes article')).to_contain_text('→ provider/gpt-native-test')
+        expect(page.locator('.model-routes article')).to_contain_text('订阅期内')
+        expect(page.locator('.model-routes article')).to_contain_text('登录账号：synthetic@example.invalid')
+        expect(page.locator('.model-routes article')).to_contain_text('按量计费')
+        for m in reasoning_models:
+            invoke('set_model_source',{'id':alias_source,'model':m})
+        restored=json.load(http.open(f'http://127.0.0.1:{proxy_port}/v1/models?client_version=0.150.0'))['models']
+        for m in reasoning_models:
+            row=next(r for r in restored if r['slug']==m)
+            assert [e['effort'] for e in row['supported_reasoning_levels']]==['low','medium','high','xhigh','max','ultra'],row
+            assert request(m,extra={'reasoning':{'effort':'ultra'}})[0]==200
+            assert seen('provider/'+m)[-1]['body']['reasoning']['effort']=='ultra'
+        assert len(next(r for r in restored if r['slug']=='gpt-6-luna')['supported_reasoning_levels'])==5
+        checks.append('OpenAI subscription/identity labels exclude credentials; Astra/Sol native efforts survive API routing and forward ultra unchanged; Luna unchanged')
         page.screenshot(path=str(out/'unified-model-alias.png'),full_page=True)
         assert json.loads(request('gpt-native-test')[1])['source']=='mapped'
         assert seen('provider/gpt-native-test')[-1]['headers']['authorization']=='Bearer synthetic-mapped'

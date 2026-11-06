@@ -96,7 +96,7 @@ pub async fn pet_menu(app:tauri::AppHandle) -> Result<(),String> {
         for source in group["sources"].as_array().into_iter().flatten() {
             let id=source["id"].as_str().unwrap_or_default();
             let item=CheckMenuItem::with_id(&app,format!("pet-source:{}",serde_json::to_string(&(id,model)).unwrap()),
-                source["name"].as_str().unwrap_or("Account"),true,group["current"].as_str()==Some(id),None::<&str>).map_err(|e|e.to_string())?;
+                source["menu_label"].as_str().or(source["name"].as_str()).unwrap_or("Account"),true,group["current"].as_str()==Some(id),None::<&str>).map_err(|e|e.to_string())?;
             sub.append(&item).map_err(|e|e.to_string())?;
         }
         menu.append(&sub).map_err(|e|e.to_string())?;

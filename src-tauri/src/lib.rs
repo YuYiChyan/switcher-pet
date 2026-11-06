@@ -5,6 +5,8 @@
 pub mod account;
 mod app_paths;
 mod model_routes;
+mod native_metadata;
+mod source_identity;
 mod pool_math;
 mod pool_api;
 mod source_probe;

@@ -4,6 +4,10 @@ pub mod relay_translate;
 pub mod antigravity;
 #[path = "../../src-tauri/src/pool_math.rs"]
 pub mod pool_math;
+#[path = "../../src-tauri/src/native_metadata.rs"]
+pub mod native_metadata;
+#[path = "../../src-tauri/src/source_identity.rs"]
+pub mod source_identity;
 
 #[cfg(test)]
 mod regressions {

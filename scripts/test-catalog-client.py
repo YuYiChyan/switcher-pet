@@ -37,5 +37,15 @@ with tempfile.TemporaryDirectory(prefix='switcher-catalog-') as root:
             print(json.dumps({'visible':visible,'missing':missing,'count':len(result),'real_requests':0}))
             assert not missing,missing
             assert [m for m in visible if m in expected]==expected,'Codex model/list order differs from catalog priority'
+            verified={}
+            for model in ['gpt-6-astra','gpt-6-sol','gpt-6.1-sol','gpt-6-luna']:
+                row=next((r for r in result if r['model']==model),None)
+                if row is None:continue
+                efforts=[e['reasoningEffort'] for e in row['supportedReasoningEfforts']]
+                expected_efforts=['low','medium','high','xhigh','max']
+                if model!='gpt-6-luna':expected_efforts.append('ultra')
+                assert efforts==expected_efforts,(model,efforts)
+                verified[model]=efforts
+            print(json.dumps({'native_reasoning_picker':verified,'real_requests':0}))
         finally:
             timer.cancel();proc.terminate();proc.wait(timeout=5)
