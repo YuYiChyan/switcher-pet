@@ -10,7 +10,7 @@
 
 代码段与节区布局保持逐字节一致。旧应用标识的匿名化可能让 WebView 使用新的数据目录，因此这些副本定位为历史研究归档，日常运行请选择当前发布版。此次归档完成静态 PE、资源清单、内容哈希与隐私检查；历史版本的启动和真实账号行为沿用各自原有验证状态。
 
-原始包保留在本地。归档副本带有 `ARCHIVE-PROVENANCE.json`，记录原始/归档哈希、处理类型与源码来源。实现脚本为 [`archive-historical-preview.py`](../scripts/archive-historical-preview.py)。
+原始未脱敏包不随公开归档发布；公开副本经匿名化，不能视作原始包的逐字节备份。归档副本带有 `ARCHIVE-PROVENANCE.json`，记录原始/归档哈希、处理类型与源码来源。实现脚本为 [`archive-historical-preview.py`](../scripts/archive-historical-preview.py)。
 
 preview 1–13 的源码在 preview 14 才合并提交；仓库保留这个真实的合并节点，而不是为历史包补造精确源码标签。不得将未来历史 Release 的索引提交误认为各早期二进制对应的源码快照。preview 7 是开发节点，preview 11 是中间构建。
 
