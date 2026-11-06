@@ -3,6 +3,18 @@ use crate::relay_translate;
 use serde_json::{json, Value};
 
 const MODEL: &str = "gemini-3.7-flash-high";
+#[test]
+fn local_schema_refs_are_expanded_and_cycles_rejected() {
+    let mut req=request();
+    req["tools"]=json!([{"type":"function","name":"typed","parameters":{
+        "type":"object","properties":{"payload":{"$ref":"#/$defs/Payload"}},
+        "$defs":{"Payload":{"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}}
+    }}]);
+    let (body,_)=setup(&req);
+    assert_eq!(body.pointer("/request/tools/0/functionDeclarations/0/parameters/properties/payload/properties/text/type"),Some(&json!("string")));
+    req["tools"][0]["parameters"]["$defs"]["Payload"]=json!({"$ref":"#/$defs/Payload"});
+    assert!(responses_to_antigravity(&serde_json::to_vec(&req).unwrap(),MODEL,"p").is_err());
+}
 fn request() -> Value {
     json!({"model":MODEL,"input":"test","stream":true,"tools":[
         {"type":"namespace","name":"functions","tools":[

@@ -1,0 +1,15 @@
+[package]
+name = "switcher-pet-isolation-tests"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Compile the actual production module without starting Tauri or loading accounts.
+[lib]
+path = "../../src-tauri/src/app_paths.rs"
+
+[dependencies]
+dirs = "5"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

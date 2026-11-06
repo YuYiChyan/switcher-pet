@@ -1,0 +1,57 @@
+{
+  "author": "fywdy",
+  "modified": false,
+  "assets": [
+    {
+      "sha256": "E8B01D78F8B92C12EDB60A4D00D1834A99BD098850D0948BED7738C65C234365",
+      "family": "grok",
+      "file": "grok.webp",
+      "source_path": "grok-gothic-chibi-v1/qa/previews/idle.webp"
+    },
+    {
+      "sha256": "805542C9532B3E75D895CB83CBAADFA735B4A4D22BCF63CA0EF166B561D65977",
+      "family": "deepseek",
+      "file": "deepseek.webp",
+      "source_path": "deepseek-whale-maid-chibi-v4/qa/previews/idle.webp"
+    },
+    {
+      "sha256": "BC8AD881BB13B3530E81C60110DCE3544BC1C59948F72588C29485F2DAE21084",
+      "family": "claude",
+      "file": "claude.webp",
+      "source_path": "claude-orange-scholar-chibi-v3/qa/previews/idle.webp"
+    },
+    {
+      "sha256": "F8376FC0E274B91C8E564C9A8787D3B99417C7963223CE1963155FE60ACFAD29",
+      "family": "kimi",
+      "file": "kimi.webp",
+      "source_path": "kimi-moon-maid-chibi-v2/qa/previews/idle.webp"
+    },
+    {
+      "sha256": "B976DA60115F7AC2EA916E2D669B05E155F268984763CF5A75E9C7016EDA2E96",
+      "family": "qwen",
+      "file": "qwen.webp",
+      "source_path": "qwen-chibi-scholar-v3/qa/previews/idle.webp"
+    },
+    {
+      "sha256": "61DF3BAFF454489DBDCF30E4E58220064C7309CA7A78EF1A82CE52C19C04CAF3",
+      "family": "gpt",
+      "file": "gpt.webp",
+      "source_path": "chatgpt-white-dragon-chibi-v5/qa/previews/idle.webp"
+    },
+    {
+      "sha256": "B314BCE1A53950072824656D04C9FDAB8BFFFCCAB1549E34DD326E632F4CB30C",
+      "family": "glm",
+      "file": "glm.webp",
+      "source_path": "zhipu-chibi-tech-v2/qa/previews/idle.webp"
+    },
+    {
+      "sha256": "40BD981ADEB20D28F2DD756AD28C325BD30B64B0E7A17912AC4EF4B4A7330D40",
+      "family": "gemini",
+      "file": "gemini.webp",
+      "source_path": "gemini-star-cat-chibi-v1/qa/previews/idle.webp"
+    }
+  ],
+  "commit": "d5bbb27c79e5c08e8b8ab44d4023cd35a67418e2",
+  "license": "CC BY-NC 4.0",
+  "source": "https://github.com/fywdy/chatgpt-chibi-pets"
+}

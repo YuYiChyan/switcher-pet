@@ -18,6 +18,8 @@ use std::io::Read;
 
 #[derive(Debug, Clone)]
 pub struct ParsedAccount {
+    /// Native exports carry routing/type/usage metadata, not just OAuth tokens.
+    pub native: Option<crate::account::Account>,
     pub email: String,
     pub auth_json: Value,
     /// 自动登录链路用得上的元信息（plan_type 等）暂时不动 store schema，先丢这里
@@ -199,6 +201,7 @@ fn parse_cpa_single(v: &Value) -> Result<ParsedAccount, String> {
         "last_refresh": last_refresh,
     });
     Ok(ParsedAccount {
+        native: None,
         email,
         auth_json,
         plan_type: None,
@@ -266,6 +269,7 @@ fn parse_sub2api(v: &Value) -> Result<Vec<ParsedAccount>, String> {
             "last_refresh": chrono::Utc::now().to_rfc3339(),
         });
         out.push(ParsedAccount {
+            native: None,
             email,
             auth_json,
             plan_type,
@@ -328,6 +332,7 @@ fn parse_cockpit(arr: &[Value]) -> Result<Vec<ParsedAccount>, String> {
             "last_refresh": chrono::Utc::now().to_rfc3339(),
         });
         out.push(ParsedAccount {
+            native: None,
             email,
             auth_json,
             plan_type,
@@ -372,6 +377,7 @@ fn parse_four_segment_rt(text: &str) -> Result<Vec<ParsedAccount>, String> {
             "last_refresh": chrono::Utc::now().to_rfc3339(),
         });
         out.push(ParsedAccount {
+            native: None,
             email,
             auth_json,
             plan_type: None,
@@ -507,6 +513,7 @@ fn parse_native(v: &Value) -> Result<Vec<ParsedAccount>, String> {
             .map(|s| s.is_empty())
             .unwrap_or(true);
         out.push(ParsedAccount {
+            native: Some(serde_json::from_value(acc.clone()).map_err(|_| "Invalid native account record")?),
             email,
             auth_json,
             plan_type: None,

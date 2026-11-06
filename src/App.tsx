@@ -10,6 +10,9 @@ import { useUsage } from './hooks/useUsage';
 import { AddAccountModal } from './components/AddAccountModal';
 import { AddRelayModal } from './components/AddRelayModal';
 import { Dashboard } from './components/Dashboard';
+import { ModelRoutes } from './components/ModelRoutes';
+import { PetSettings } from './components/PetSettings';
+import { PoolSettings } from './components/PoolSettings';
 import { AccountList } from './components/AccountList';
 import { Settings } from './components/Settings';
 import { Proxy } from './components/Proxy';
@@ -23,9 +26,13 @@ import { LanguagePicker } from './components/LanguagePicker';
 import './App.css';
 import { isMacOS } from './platform';
 
-type PageType = 'dashboard' | 'accounts' | 'proxy' | 'routes' | 'stats' | 'cache' | 'skills' | 'settings';
+type PageType = 'pet' | 'models' | 'pool' | 'dashboard' | 'accounts' | 'proxy' | 'routes' | 'stats' | 'cache' | 'skills' | 'settings';
 
 function App() {
+  const [isolatedPreview, setIsolatedPreview] = useState(false);
+  useEffect(() => {
+    invoke<boolean>('get_isolated_preview_mode').then(setIsolatedPreview).catch(console.error);
+  }, []);
   const {
     accounts,
     currentId,
@@ -54,13 +61,15 @@ function App() {
   } = useUsage();
 
   const [currentPage, setCurrentPage] = useState<PageType>(() => {
-    const saved = localStorage.getItem('currentPage');
-    return (saved as PageType) || 'dashboard';
+    const saved = localStorage.getItem('switcher-pet.page');
+    return (saved as PageType) || 'models';
   });
+
+  useEffect(()=>{const event=listen('pet-open-settings',()=>setCurrentPage('pet'));return()=>{void event.then(fn=>fn());};},[]);
 
   // 持久化当前 tab
   useEffect(() => {
-    localStorage.setItem('currentPage', currentPage);
+    localStorage.setItem('switcher-pet.page', currentPage);
   }, [currentPage]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showRelayModal, setShowRelayModal] = useState(false);
@@ -311,7 +320,7 @@ function App() {
           <div className="app-logo">
             <Zap size={18} />
           </div>
-          <h1>Codex Switcher <span className="app-version">{appVersion ? `v${appVersion}` : 'v—'}</span></h1>
+          <h1>Switcher Pet <span className="app-version">{appVersion ? `v${appVersion}` : 'v—'}</span></h1>
           <div className={`proxy-indicator ${proxyRunning ? 'on' : 'off'}`} title={proxyRunning ? '代理运行中' : '代理未启动'}>
             <span className="proxy-dot" />
             {proxyRunning ? 'Proxy ON' : 'Proxy OFF'}
@@ -320,6 +329,9 @@ function App() {
 
         {/* 导航菜单 */}
         <nav className="header-nav">
+          <button className={`nav-item ${currentPage === 'models' ? 'active' : ''}`} onClick={() => setCurrentPage('models')}>模型与来源</button>
+          <button className={`nav-item ${currentPage === 'pet' ? 'active' : ''}`} onClick={() => setCurrentPage('pet')}>桌宠与声音</button>
+          <button className={`nav-item ${currentPage === 'pool' ? 'active' : ''}`} onClick={() => setCurrentPage('pool')}>额度与探针</button>
           <button
             className={`nav-item ${currentPage === 'dashboard' ? 'active' : ''}`}
             onClick={() => setCurrentPage('dashboard')}
@@ -372,6 +384,7 @@ function App() {
 
         <div className="header-actions">
           <LanguagePicker />
+          <button className="btn" onClick={() => void invoke('open_pet').catch(e => alert(String(e)))}>显示桌宠</button>
           <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
             + 登录账号
           </button>
@@ -395,7 +408,12 @@ function App() {
       )}
 
       <main className="app-main">
-        {currentPage === 'dashboard' ? (
+        {isolatedPreview && (
+          <div role="status" className="isolated-preview-notice">
+            自用开源版
+          </div>
+        )}
+        {currentPage === 'pet' ? <PetSettings /> : currentPage === 'pool' ? <PoolSettings /> : currentPage === 'models' ? <ModelRoutes accounts={accounts} onAddSource={() => setShowRelayModal(true)} /> : currentPage === 'dashboard' ? (
           <Dashboard
             accounts={accounts}
             currentAccount={currentAccount}

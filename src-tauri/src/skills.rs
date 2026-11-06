@@ -116,7 +116,7 @@ impl Default for SkillData {
 
 /// SSOT 目录：~/.codex-switcher/skills/
 fn ssot_dir() -> PathBuf {
-    dirs::home_dir()
+    crate::app_paths::profile_home()
         .unwrap()
         .join(".codex-switcher")
         .join("skills")
@@ -124,7 +124,7 @@ fn ssot_dir() -> PathBuf {
 
 /// 各 CLI 的 skills 目录（跨平台）
 fn app_skills_dir(app: &str) -> Option<PathBuf> {
-    let home = dirs::home_dir()?;
+    let home = crate::app_paths::profile_home()?;
     match app {
         "codex" => Some(home.join(".codex").join("skills")),
         "claude" => Some(home.join(".claude").join("skills")),
@@ -139,7 +139,7 @@ fn app_skills_dir(app: &str) -> Option<PathBuf> {
             // Windows: %APPDATA%\opencode\skills, Unix: ~/.config/opencode/skills
             #[cfg(windows)]
             {
-                dirs::config_dir().map(|c| c.join("opencode").join("skills"))
+                crate::app_paths::profile_config_dir().map(|c| c.join("opencode").join("skills"))
             }
             #[cfg(not(windows))]
             {
@@ -153,7 +153,7 @@ fn app_skills_dir(app: &str) -> Option<PathBuf> {
 /// 初始化 SSOT：如果 ~/.codex/skills/ 是真实目录（非 symlink），迁移到 SSOT
 pub fn init_ssot() -> Result<(), String> {
     let ssot = ssot_dir();
-    let codex_skills = dirs::home_dir().unwrap().join(".codex").join("skills");
+    let codex_skills = crate::app_paths::profile_home().unwrap().join(".codex").join("skills");
 
     // SSOT 不存在 → 需要创建。
     // 即使 SSOT 和 Codex 已经准备好，也不能在这里提前返回；其他 CLI
@@ -215,7 +215,7 @@ pub fn init_ssot() -> Result<(), String> {
 }
 
 fn legacy_antigravity_skills_dir() -> Option<PathBuf> {
-    dirs::home_dir().map(|home| {
+    crate::app_paths::profile_home().map(|home| {
         home.join(".gemini")
             .join("antigravity")
             .join(".agents")
@@ -258,7 +258,7 @@ fn migrate_legacy_antigravity_skills(ssot: &std::path::Path) -> Result<(), Strin
 /// 仅清理带有本项目 manifest 的镜像目录；没有 manifest 的目录视为用户
 /// 自己维护的内容，保留不动。builtin/skills 不在这个路径范围内。
 fn cleanup_legacy_antigravity_root_skills() -> Result<(), String> {
-    let Some(home) = dirs::home_dir() else {
+    let Some(home) = crate::app_paths::profile_home() else {
         return Ok(());
     };
     let legacy = home.join(".gemini").join("antigravity").join("skills");
@@ -505,7 +505,7 @@ fn migrate_existing_app_skills_to_ssot(
     target: &std::path::Path,
     ssot: &std::path::Path,
 ) -> Result<(), String> {
-    let backup_root = dirs::home_dir()
+    let backup_root = crate::app_paths::profile_home()
         .unwrap()
         .join(".codex-switcher")
         .join("skills-backup")
@@ -545,7 +545,7 @@ fn migrate_existing_app_skills_to_ssot(
 }
 
 fn data_path() -> PathBuf {
-    dirs::home_dir()
+    crate::app_paths::profile_home()
         .unwrap()
         .join(".codex-switcher")
         .join("skills.json")

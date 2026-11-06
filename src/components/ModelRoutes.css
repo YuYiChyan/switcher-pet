@@ -1,0 +1,37 @@
+/* Desktop routing workbench: model index → source table, not account cards.
+   Mist #eef5fb / navy #142638 / cobalt #356ad2 / teal #087c83 / rule #cbdce8.
+   Native Segoe UI/YaHei; model names lead, each separator groups real choices. */
+.model-routes { background: #eef5fb; color: #142638; padding: 28px; border-radius: 16px; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; }
+.model-routes-heading { display:flex; justify-content:space-between; gap:24px; align-items:start; margin-bottom:28px; }
+.model-routes h2 { font-size:28px; margin:0 0 8px; font-weight:650; }
+.model-routes p { line-height:1.7; max-width:74ch; }
+.model-routes-heading p { margin:0; color:#405c73; }
+.model-routes button { font:inherit; cursor:pointer; background:white; border:1px solid #b9cedf; color:#142638; padding:9px 14px; border-radius:6px; }
+.model-routes button:disabled { opacity:.5; cursor:default; }
+.model-routes button:focus-visible, .model-routes input:focus-visible { outline:3px solid #356ad2; outline-offset:3px; }
+.model-routes-actions { display:flex; gap:8px; flex-shrink:0; }
+.model-routes-actions button:last-child { background:#356ad2; color:white; border-color:#356ad2; }
+.model-routes-workspace { display:grid; grid-template-columns:minmax(220px, 28%) minmax(0,1fr); min-height:440px; border-top:1px solid #cbdce8; }
+.model-routes aside { padding:20px 22px 0 0; border-right:1px solid #cbdce8; }
+.model-routes aside>input { width:100%; box-sizing:border-box; background:white; color:#142638; border:1px solid #b9cedf; padding:10px; border-radius:6px; font:inherit; }
+.model-routes-list { display:flex; flex-direction:column; gap:4px; margin-top:14px; }
+.model-routes-list button { display:flex; flex-direction:column; text-align:left; background:transparent; border-color:transparent; overflow-wrap:anywhere; gap:6px; }
+.model-routes-list button[aria-pressed="true"] { background:#dceafb; border-left:3px solid #356ad2; }
+.model-routes-list span { color:#49637a; font-size:12px; }
+.model-routes article { padding:20px 0 0 28px; min-width:0; }
+.model-routes h3 { font-size:21px; margin:0 0 10px; overflow-wrap:anywhere; }
+.model-route-slug { display:block; margin-bottom:24px; overflow-wrap:anywhere; color:#405c73; }
+.model-routes fieldset { border:0; padding:0; min-width:0; }
+.model-routes legend { font-size:14px; color:#405c73; margin-bottom:14px; }
+.model-auto-switch { display:flex; gap:10px; align-items:center; font-weight:600; }
+.model-enable-controls { display:flex; gap:24px; flex-wrap:wrap; }
+.model-enable-controls label { display:flex; align-items:center; gap:8px; }
+.model-routes input[type="checkbox"], .model-routes input[type="radio"] { accent-color:#087c83; width:17px; height:17px; }
+.model-route-note { font-size:13px; color:#405c73; }
+.model-routes table { border-collapse:collapse; width:100%; font-size:14px; }
+.model-routes th { text-align:left; font-weight:500; color:#405c73; }
+.model-routes th,.model-routes td { border-bottom:1px solid #cbdce8; padding:14px 6px; }
+.model-routes td label { display:flex; gap:9px; align-items:center; overflow-wrap:anywhere; }
+.model-routes-empty { min-height:270px; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; border-top:1px solid #cbdce8; }
+.model-routes-error { color:#9e2424; white-space:pre-wrap; }
+@media(max-width:900px) { .model-routes-heading { flex-direction:column; } .model-routes-workspace { grid-template-columns:1fr; } .model-routes aside { border-right:0; padding-right:0; } .model-routes article { padding-left:0; } }

@@ -1,6 +1,7 @@
 pub mod flow;
 pub mod models;
 pub mod native;
+pub mod lease;
 pub mod oauth;
 pub mod quota;
 #[cfg(test)]

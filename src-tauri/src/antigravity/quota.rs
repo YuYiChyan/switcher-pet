@@ -302,6 +302,9 @@ pub fn write_model_quotas(auth_json: &mut Value, quotas: &HashMap<String, ModelQ
 }
 
 pub fn mark_model_exhausted(auth_json: &mut Value, model_id: &str) {
+    mark_model_exhausted_for(auth_json,model_id,60);
+}
+pub fn mark_model_exhausted_for(auth_json: &mut Value, model_id: &str, retry_seconds:i64) {
     let mut quotas = read_model_quotas(auth_json);
     let entry = quotas.entry(model_id.to_string()).or_insert(ModelQuota {
         remaining_fraction: 0.0,
@@ -310,6 +313,10 @@ pub fn mark_model_exhausted(auth_json: &mut Value, model_id: &str) {
         ..ModelQuota::default()
     });
     entry.remaining_fraction = 0.0;
+    // A transient 429 with no reset metadata must not ban this model forever.
+    if !entry.reset_time.as_deref().and_then(|s|DateTime::parse_from_rfc3339(s).ok()).is_some_and(|t|t.with_timezone(&Utc)>Utc::now()) {
+        entry.reset_time=Some((Utc::now()+chrono::Duration::seconds(retry_seconds.clamp(1,86400))).to_rfc3339());
+    }
     entry.updated_at = Utc::now().to_rfc3339();
     write_model_quotas(auth_json, &quotas);
 }

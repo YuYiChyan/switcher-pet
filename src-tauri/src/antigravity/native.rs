@@ -14,6 +14,21 @@ pub const STREAM_URL: &str =
     "https://daily-cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse";
 pub const GOOGLE_API_CLIENT: &str = "gl-node/22.21.1";
 
+/// Synthetic desktop integration fixtures may address loopback only. Production
+/// always uses the fixed Google endpoints, regardless of account/project text.
+pub fn generate_endpoint(stream:bool,project:&str)->String {
+    if std::env::args().any(|a|a=="--validation") {
+        if let Some(raw)=project.strip_prefix("validation:") {
+            if let Ok(url)=reqwest::Url::parse(raw) {
+                if url.scheme()=="http" && url.host_str()==Some("127.0.0.1") && url.username().is_empty() && url.password().is_none() {
+                    return format!("{}/{}",raw.trim_end_matches('/'),if stream{"streamGenerateContent"}else{"generateContent"});
+                }
+            }
+        }
+    }
+    if stream{STREAM_URL}else{GENERATE_URL}.into()
+}
+
 const FALLBACK_VERSION: &str = "2.9.1";
 const VERSION_MANIFEST_URL: &str =
     "https://antigravity-hub-auto-updater-974169037036.us-central1.run.app/manifest/latest-arm64-mac.yml";
@@ -25,6 +40,9 @@ static VERSION_CACHE: LazyLock<tokio::sync::RwLock<Option<(String, Instant)>>> =
 pub fn build_http_client() -> Result<Client, String> {
     Client::builder()
         .http1_only()
+        .redirect(reqwest::redirect::Policy::none())
+        .connect_timeout(Duration::from_secs(20))
+        .read_timeout(Duration::from_secs(120))
         .pool_max_idle_per_host(100)
         .pool_idle_timeout(Duration::from_secs(10 * 60))
         .build()

@@ -61,7 +61,9 @@ pub fn model_for_id(id: &str) -> Option<AntigravityModel> {
     } else {
         vec!["low", "medium", "high"]
     };
-    let default_thinking_level = if id.ends_with("-extra-low") {
+    let default_thinking_level = if id.starts_with("gpt-oss-") {
+        "medium"
+    } else if id.ends_with("-extra-low") {
         "minimal"
     } else if id.ends_with("-low") {
         "low"
@@ -128,7 +130,7 @@ fn humanize_model_id(id: &str) -> String {
         .join(" ")
 }
 
-fn model_family(id: &str) -> &str {
+pub fn model_family(id: &str) -> &str {
     for suffix in [
         "-extra-low",
         "-thinking",
@@ -142,6 +144,36 @@ fn model_family(id: &str) -> &str {
         }
     }
     id
+}
+
+/// Gemini preset suffixes select effort within the same model, not a new model.
+pub fn gemini_family(id: &str) -> &str {
+    if id.starts_with("gemini-") { model_family(id) } else { id }
+}
+
+pub fn preset_effort(id: &str) -> Option<&'static str> {
+    if !id.starts_with("gemini-") { return None; }
+    if id.ends_with("-extra-low") {Some("minimal")}
+    else if id.ends_with("-low") {Some("low")}
+    else if id.ends_with("-medium") {Some("medium")}
+    else if id.ends_with("-high") {Some("high")}
+    else {None}
+}
+
+/// Resolve only advertised variants of this exact Gemini family. Google can
+/// override an advertised preset through thinkingConfig; generic APIs cannot.
+pub fn gemini_variant<'a>(ids: impl IntoIterator<Item=&'a str>, requested: &str, effort: Option<&str>, google: bool) -> Option<String> {
+    let family=gemini_family(requested);
+    let mut candidates:Vec<_>=ids.into_iter().filter(|id|gemini_family(id)==family).collect();
+    candidates.sort_by_key(|id|(preset_priority(id),*id));
+    if !requested.starts_with("gemini-") {return candidates.into_iter().find(|id|*id==requested).map(str::to_owned);}
+    let desired=effort.or_else(||preset_effort(requested));
+    if let Some(desired)=desired {
+        if let Some(id)=candidates.iter().find(|id|preset_effort(id)==Some(desired)){return Some((*id).to_owned());}
+        if let Some(id)=candidates.iter().find(|id|**id==family){return Some((*id).to_owned());}
+        if !google {return None;}
+    }
+    candidates.first().map(|id|(*id).to_owned())
 }
 
 fn preset_priority(id: &str) -> u8 {
@@ -213,6 +245,24 @@ pub fn grouped_display_models(models: &[AntigravityModel]) -> Vec<AntigravityMod
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn gemini_family_keeps_model_versions_and_variants_separate_from_effort() {
+        assert_eq!(gemini_family("gemini-3.8-flash-extra-low"),"gemini-3.8-flash");
+        assert_ne!(gemini_family("gemini-3.8-flash-high"),gemini_family("gemini-4-argon-high"));
+        assert_eq!(gemini_family("gemini-3.8-flash-lite"),"gemini-3.8-flash-lite");
+        assert_eq!(gemini_family("claude-sonnet-5-5-high"),"claude-sonnet-5-5-high");
+    }
+
+    #[test]
+    fn gemini_variant_uses_exact_effort_and_never_downgrades_generic_apis() {
+        let ids=["gemini-3.8-flash-low","gemini-3.8-flash-high"];
+        assert_eq!(gemini_variant(ids,"gemini-3.8-flash",Some("low"),false).as_deref(),Some(ids[0]));
+        assert!(gemini_variant(ids,"gemini-3.8-flash",Some("medium"),false).is_none());
+        assert_eq!(gemini_variant(ids,"gemini-3.8-flash-low",None,false).as_deref(),Some(ids[0]));
+        assert_eq!(gemini_variant(ids,"gemini-3.8-flash",Some("medium"),true).as_deref(),Some(ids[1]));
+        assert!(gemini_variant(ids,"gemini-4-argon",Some("high"),true).is_none());
+    }
 
     #[test]
     fn model_menu_groups_effort_presets_and_orders_newest_first() {

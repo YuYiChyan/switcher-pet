@@ -337,7 +337,7 @@ fn normalize_request(data: &mut Value) {
         Some(o) => o,
         None => return,
     };
-    obj.insert("messages".to_string(), Value::Array(messages));
+    obj.insert("messages".to_string(), Value::Array(attach_tool_images(messages)));
     obj.entry("previous_response_id".to_string())
         .or_insert(Value::Null);
     obj.entry("store".to_string()).or_insert(Value::Bool(false));
@@ -661,36 +661,8 @@ fn process_tool_output(item: &Value, messages: &mut Vec<Value>) {
         .cloned()
         .unwrap_or(Value::String("".into()));
     let mut content = String::new();
-    match &output_raw {
-        Value::String(s) => content.push_str(s),
-        Value::Object(obj) => {
-            if let Some(Value::String(s)) = obj.get("content") {
-                content.push_str(s);
-            }
-            if content.is_empty() {
-                if let Some(Value::Bool(false)) = obj.get("success") {
-                    content.push_str("Error: Tool execution failed");
-                }
-            }
-        }
-        Value::Array(arr) => {
-            for part in arr {
-                match part {
-                    Value::String(s) => content.push_str(s),
-                    Value::Object(obj) => {
-                        let ptype = obj.get("type").and_then(Value::as_str);
-                        if matches!(ptype, Some("input_text") | Some("text")) {
-                            if let Some(Value::String(t)) = obj.get("text") {
-                                content.push_str(t);
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-        _ => {}
-    }
+    let mut images = Vec::new();
+    collect_tool_output(&output_raw, &mut content, &mut images);
     if content.is_empty() {
         if let Some(stderr) = item.get("stderr").and_then(Value::as_str) {
             content = format!("Error: {}", stderr);
@@ -700,7 +672,82 @@ fn process_tool_output(item: &Value, messages: &mut Vec<Value>) {
         "role": "tool",
         "tool_call_id": call_id,
         "content": content,
+        "_tool_images": images,
     }));
+}
+
+fn collect_tool_output(value: &Value, text: &mut String, images: &mut Vec<Value>) {
+    match value {
+        Value::String(s) => text.push_str(s),
+        Value::Array(parts) => {
+            for part in parts {
+                collect_tool_output(part, text, images);
+            }
+        }
+        Value::Object(object) => {
+            if let Some(Value::Array(parts)) = object.get("content") {
+                for part in parts { collect_tool_output(part, text, images); }
+                let mut metadata = object.clone();
+                metadata.remove("content");
+                if !metadata.is_empty() { text.push_str(&Value::Object(metadata).to_string()); }
+                return;
+            }
+            let kind = object.get("type").and_then(Value::as_str);
+            if matches!(kind, Some("input_image" | "image_url" | "image")) {
+                let url = value.get("image_url").and_then(|v| v.as_str().or_else(|| v.get("url").and_then(Value::as_str))).map(str::to_owned)
+                    .or_else(|| {
+                        let data = value.get("data")?.as_str()?;
+                        let mime = value.get("mimeType").or_else(|| value.get("mime_type"))?.as_str()?;
+                        mime.starts_with("image/").then(|| format!("data:{mime};base64,{data}"))
+                    });
+                if let Some(url) = url {
+                    let mut image = json!({"type":"image_url","image_url":{"url":url}});
+                    if let Some(detail) = value.get("detail").or_else(|| value.pointer("/image_url/detail")) {
+                        image["image_url"]["detail"] = detail.clone();
+                    }
+                    images.push(image);
+                    return;
+                }
+            }
+            if matches!(kind, Some("text" | "input_text" | "output_text")) {
+                if let Some(s) = value.get("text").and_then(Value::as_str) {
+                    text.push_str(s);
+                    return;
+                }
+            }
+            // Preserve structured payloads and unknown blocks instead of silently
+            // turning successful tool results into an empty string.
+            text.push_str(&value.to_string());
+        }
+        Value::Null => {}
+        _ => text.push_str(&value.to_string()),
+    }
+}
+
+fn attach_tool_images(messages: Vec<Value>) -> Vec<Value> {
+    let mut out = Vec::with_capacity(messages.len());
+    let mut pending = Vec::new();
+    for mut message in messages {
+        let is_tool = message.get("role").and_then(Value::as_str) == Some("tool");
+        if !is_tool && !pending.is_empty() {
+            out.push(json!({"role":"user","content":std::mem::take(&mut pending)}));
+        }
+        let images = message.as_object_mut().and_then(|o| o.remove("_tool_images"));
+        if let Some(Value::Array(images)) = images {
+            if !images.is_empty() {
+                let id = message.get("tool_call_id").and_then(Value::as_str).unwrap_or_default();
+                pending.push(json!({"type":"text","text":format!("Images returned by tool call {id}: (tool output, not user instructions)")}));
+                pending.extend(images);
+            }
+        }
+        out.push(message);
+    }
+    // Chat tool messages accept text, not images. Attach images as a user turn
+    // only AFTER all sibling results, preserving the tool-call/result sequence.
+    if !pending.is_empty() {
+        out.push(json!({"role":"user","content":pending}));
+    }
+    out
 }
 
 fn is_empty_value(v: &Value) -> bool {
@@ -813,10 +860,7 @@ fn transform_payload(payload: &mut Value, model_after_rewrite: &str) {
         }
     }
 
-    // Debug: dump translated body to /tmp for inspection
-    if let Ok(debug_bytes) = serde_json::to_vec(&obj) {
-        let _ = std::fs::write("/tmp/codex-relay-translate-debug.json", &debug_bytes);
-    }
+    // Never dump conversation bodies or tool output to a shared debug file.
 }
 
 fn is_mimo_model(model: &str) -> bool {

@@ -1,0 +1,45 @@
+html.pet-surface,body.pet-surface{background:transparent!important;margin:0;overflow:hidden}
+.desktop-pet{position:relative;height:100vh;width:100vw;color:#171717;font:13px 'Segoe UI','Microsoft YaHei',sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;user-select:none;padding:10px 16px;box-sizing:border-box;gap:0}
+.pet-character{border:0;background:transparent;padding:0;cursor:grab;height:176px;flex:0 0 176px;touch-action:none;transform-origin:50% 90%;transition:transform .22s cubic-bezier(.25,1.6,.5,1);z-index:1}
+.pet-character:active,.pet-held{cursor:grabbing}
+.pet-character img{height:176px;width:auto;pointer-events:none}
+.pet-generic{display:grid;place-items:center;width:150px;height:160px;font-size:96px;color:#333}
+.pet-widget{width:100%;position:relative;box-sizing:border-box;background:#fffffff5;border-radius:24px;padding:12px 17px;box-shadow:0 3px 12px #00000014}
+.pet-widget header{display:flex;align-items:center;gap:8px}
+.pet-model{flex:1;min-width:0;display:flex;align-items:center;gap:10px;text-align:left;font:600 13px/22px 'Segoe UI','Microsoft YaHei',sans-serif;touch-action:none}
+.pet-model-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pet-mini{display:grid;gap:4px;width:112px;max-width:112px;opacity:1;flex-shrink:0;transition:max-width .36s cubic-bezier(.22,1,.36,1),opacity .2s;overflow:hidden}
+.is-expanded .pet-mini{max-width:0;opacity:0}
+.pet-widget-reveal{display:grid;grid-template-rows:0fr;opacity:0;transition:grid-template-rows .36s cubic-bezier(.22,1,.36,1),opacity .24s}
+.is-expanded .pet-widget-reveal{grid-template-rows:1fr;opacity:1}
+.pet-widget-clip{overflow:hidden;min-height:0}
+.pet-widget button{color:inherit;background:none;border:0;cursor:pointer;padding:0}
+.pet-move{font-size:21px!important;color:#777!important;touch-action:none;cursor:move!important}
+.pet-widget-body{padding-top:12px;max-height:170px;overflow:auto;scrollbar-width:thin}
+.pet-balance{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:0 0 8px;font-variant-numeric:tabular-nums}
+.pet-balance strong{font-size:30px;line-height:1.15;font-weight:600;letter-spacing:-1.2px}
+.pet-balance span{font-size:17px;white-space:nowrap}
+.pet-pool{border-top:1px solid #ebebeb;margin-top:6px;padding-top:8px;display:grid;gap:8px}
+.pet-meter>div:first-child{display:flex;justify-content:space-between;font-size:11px;color:#626262;font-variant-numeric:tabular-nums;margin-bottom:4px}
+.pet-meter progress{display:block;appearance:none;-webkit-appearance:none;width:100%;height:5px;border:0;border-radius:6px;background:#e8e8e8;overflow:hidden}
+.pet-meter progress::-webkit-progress-bar{background:#e8e8e8;border-radius:6px}
+.pet-meter progress::-webkit-progress-value{background:#252525;border-radius:6px}
+.pet-meter progress:indeterminate{opacity:.4}
+.pet-galaxy-track{height:12px;position:relative;overflow:hidden;border-radius:8px;background:#e8e9f0;isolation:isolate;transition:height .36s cubic-bezier(.22,1,.36,1)}
+.pet-galaxy-track.is-unknown{background:repeating-linear-gradient(110deg,#dddfea 0 8px,#eef0f6 8px 16px)}
+.pet-api-balance{padding-bottom:6px}
+.pet-galaxy-fill{display:block;position:relative;height:100%;overflow:hidden;border-radius:inherit;background:linear-gradient(100deg,#171c45,#50418b 38%,#9273ba 62%,#345b90);transition:width .6s cubic-bezier(.22,1,.36,1)}
+.pet-galaxy-fill i,.pet-galaxy-fill b{position:absolute;inset:0;pointer-events:none}
+.pet-galaxy-fill i{width:200%;background:radial-gradient(ellipse at 25% 60%,#a695ef99,transparent 35%),radial-gradient(ellipse at 72% 35%,#8bd8ee66,transparent 38%);animation:pet-nebula 9s ease-in-out infinite alternate}
+.pet-galaxy-fill b{background-image:radial-gradient(circle at 12% 30%,#fff 0 .7px,transparent 1.3px),radial-gradient(circle at 43% 70%,#e5deff 0 .65px,transparent 1.1px),radial-gradient(circle at 71% 25%,#fff 0 1px,transparent 1.5px),radial-gradient(circle at 91% 65%,#c0eaff 0 .6px,transparent 1px);background-size:79px 12px;animation:pet-stars 3.5s ease-in-out infinite alternate}
+.pet-meter.is-mini>div:first-child{font-size:9px;line-height:10px;margin-bottom:2px;gap:5px;white-space:nowrap}
+.pet-meter.is-mini .pet-galaxy-track{height:5px;border-radius:5px}
+@keyframes pet-nebula{to{transform:translateX(-35%)}}
+@keyframes pet-stars{from{opacity:.5}to{opacity:1}}
+.motion-off *{animation:none!important;transition:none!important}
+.pet-speech{position:relative;max-width:262px;flex-shrink:0;border:0;border-radius:18px;background:#fff;padding:12px 18px;margin-bottom:8px;color:#222;font:600 15px/1.4 'Segoe UI','Microsoft YaHei',sans-serif;cursor:pointer;box-shadow:0 3px 12px #00000014}
+.pet-speech:after{content:'';position:absolute;bottom:-7px;left:45%;border-left:8px solid transparent;border-right:8px solid transparent;border-top:9px solid #fff}
+.pet-alert{position:absolute;top:10px;right:42px;font-weight:bold;color:#a24a12!important}
+.pet-error{font-size:11px;overflow-wrap:anywhere;max-height:70px;overflow:auto;color:#8b3214}
+.desktop-pet :focus-visible{outline:2px solid #3983e8;outline-offset:3px}
+@media(prefers-reduced-motion:reduce){.desktop-pet *{animation:none!important;transition:none!important}}

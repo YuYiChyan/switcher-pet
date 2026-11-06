@@ -163,7 +163,7 @@ async fn route(
 
     if path == "/skills/bundle" && method == Method::GET {
         let bundle = tokio::task::spawn_blocking(|| {
-            let home = dirs::home_dir().ok_or("Cannot resolve Server home")?;
+            let home = crate::app_paths::profile_home().ok_or("Cannot resolve Server home")?;
             crate::skills_pull::export(&home.join(".codex-switcher/skills"), &home)
         }).await;
         return match bundle {
@@ -415,6 +415,12 @@ async fn antigravity_token_for_store(
         )
     };
 
+    if let Some(lease)=crate::antigravity::lease::original_owner(id,Some(&refresh_token),&project_id) {
+        return match lease {
+            Ok(lease)=>json_resp(StatusCode::OK,json!({"account_id":id,"access_token":lease.access_token,"project_id":project_id,"expires_at":lease.expires_at.to_rfc3339()})),
+            Err(error)=>json_resp(StatusCode::UNAUTHORIZED,json!({"error":error})),
+        };
+    }
     if project_id.is_empty() || refresh_token.is_empty() {
         return json_resp(
             StatusCode::UNAUTHORIZED,

@@ -41,6 +41,7 @@ pub fn detect_running_ides() -> Vec<String> {
 
 /// 重载指定 IDE
 pub fn reload_ide(name: &str, use_window_reload: bool) -> Result<(), String> {
+    crate::app_paths::deny_live_integration("自动重启 IDE")?;
     if !cfg!(target_os = "macos") {
         return Err("IDE 自动重载仅支持 macOS，请手动重载 IDE".into());
     }
@@ -114,6 +115,7 @@ pub fn reload_ide(name: &str, use_window_reload: bool) -> Result<(), String> {
 
 /// 移除 Codex App 的隔离属性 (修复闪退)
 pub fn remove_quarantine() -> Result<(), String> {
+    crate::app_paths::deny_live_integration("修改原版应用属性")?;
     if !cfg!(target_os = "macos") {
         return Err("隔离属性修复仅适用于 macOS".into());
     }

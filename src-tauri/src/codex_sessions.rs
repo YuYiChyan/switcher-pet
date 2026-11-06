@@ -82,9 +82,9 @@ pub fn list_codex_sessions(
 }
 
 fn sessions_root() -> PathBuf {
-    dirs::home_dir()
+    crate::app_paths::profile_home()
         .map(|h| h.join(".codex").join("sessions"))
-        .unwrap_or_else(|| PathBuf::from(".codex/sessions"))
+        .expect("isolated profile home must be available")
 }
 
 /// 检测"当前活跃的 codex 会话"：

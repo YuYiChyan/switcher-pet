@@ -47,6 +47,7 @@ pub fn account_models(account: &Account) -> BTreeSet<String> {
     if !account.is_relay()
         || (account.relay_protocol_or_default() != "responses"
             && account.relay_usage_preset.as_deref() != Some("stepfun_plan")
+            && account.relay_model_map.as_ref().is_none_or(|m|m.is_empty())
             && account.relay_model_catalog.is_empty())
     {
         return BTreeSet::new();
@@ -79,7 +80,7 @@ pub fn models_url(base: &str) -> Result<String, String> {
     let path = url.path().trim_end_matches('/');
     url.set_path(&format!(
         "{}/models",
-        if path.is_empty() { "" } else { path }
+        if path.is_empty() { "/v1" } else { path }
     ));
     Ok(url.to_string())
 }
@@ -200,7 +201,8 @@ fn choose<'a>(store: &AccountStore, items: &'a [Model], upstream: &str) -> Optio
         })
 }
 
-fn normalized_upstream(model: &Model) -> &str {
+pub fn normalized_upstream(model: &Model) -> &str {
+    if model.upstream.starts_with("gemini-") {return crate::antigravity::models::gemini_family(&model.upstream);}
     if !model.local_agy {
         return model.upstream.as_str();
     }
@@ -220,11 +222,11 @@ pub fn models(store: &AccountStore) -> Vec<Model> {
         .filter_map(|upstream| choose(store, &items, upstream))
         .map(|m| {
             let mut m = m.clone();
-            if m.local_agy {
+            if m.local_agy || m.upstream.starts_with("gemini-") {
                 let base = normalized_upstream(&m).to_string();
                 m.variants = items
                     .iter()
-                    .filter(|item| normalized_upstream(item) == base)
+                    .filter(|item| normalized_upstream(item) == base && item.account_id == m.account_id)
                     .map(|item| item.upstream.clone())
                     .collect();
                 m.upstream = base;
@@ -284,11 +286,9 @@ fn model_order(a: &str, b: &str) -> std::cmp::Ordering {
 
 pub fn ensure_currents(store: &mut AccountStore) -> bool {
     let before = store.settings.current_relay_accounts.clone();
+    let available = candidates(store);
     store.settings.current_relay_accounts.retain(|model, id| {
-        store
-            .accounts
-            .get(id)
-            .is_some_and(|a| account_models(a).contains(model))
+        available.iter().any(|m| &m.account_id == id && normalized_upstream(m) == model)
     });
     for model in models(store) {
         store
@@ -305,12 +305,13 @@ pub fn select_current(
     account_id: &str,
     upstream: Option<&str>,
 ) -> Result<(), String> {
-    let account = store
+    let _account = store
         .accounts
         .get(account_id)
         .filter(|a| eligible(a))
         .ok_or("中转账号不可用")?;
-    let ids = account_models(account);
+    let ids: BTreeSet<String> = candidates(store).iter().filter(|m| m.account_id == account_id)
+        .map(|m| normalized_upstream(m).to_owned()).collect();
     if ids.is_empty() {
         return Err("请先配置此中转的模型 ID".into());
     }
@@ -336,6 +337,7 @@ fn eligible(a: &Account) -> bool {
     a.is_relay()
         && (a.relay_protocol_or_default() == "responses"
             || a.relay_usage_preset.as_deref() == Some("stepfun_plan")
+            || a.relay_model_map.as_ref().is_some_and(|m|!m.is_empty())
             || !a.relay_model_catalog.is_empty())
         && !a.is_banned
         && !a.is_logged_out
@@ -367,15 +369,78 @@ pub fn relay_only_account_id(store: &AccountStore) -> Option<String> {
 }
 
 pub fn resolve(store: &AccountStore, slug: &str) -> Option<Model> {
-    let items = candidates(store);
-    let upstream = if let Some(model) = slug.strip_prefix(CURRENT_PREFIX) {
-        model.strip_prefix("agy:").unwrap_or(model)
+    if slug.starts_with(PREFIX) {
+        // An explicit account slug is a pin, not another alias for current.
+        return candidates(store).into_iter().find(|m| m.slug == slug && enabled(store, m));
+    }
+    let logical=crate::model_routes::logical_model(slug);
+    models(store).into_iter().find(|m| (m.slug == slug || (slug.starts_with(CURRENT_PREFIX)&&m.upstream==logical)) && enabled(store, m))
+}
+
+pub fn enabled(store: &AccountStore, model: &Model) -> bool {
+    crate::model_routes::route_policy(store,normalized_upstream(model)).is_none_or(|p| p.enabled)
+}
+pub fn visible(store: &AccountStore, model: &Model) -> bool {
+    enabled(store, model) && store.settings.model_route_policies.get(normalized_upstream(model)).is_none_or(|p| p.visible)
+}
+pub fn visible_models(store: &AccountStore) -> Vec<Model> { models(store).into_iter().filter(|m| visible(store,m)).collect() }
+pub fn visible_candidates(store: &AccountStore) -> Vec<Model> { candidates(store).into_iter().filter(|m| visible(store,m)).collect() }
+
+pub fn request_disabled(store: &AccountStore, requested: &str) -> bool {
+    let logical=crate::model_routes::logical_model(requested);
+    if crate::model_routes::route_policy(store,logical).is_some_and(|p|!p.enabled){return true;}
+    if store.settings.model_route_policies.get(requested).is_some_and(|p| !p.enabled) { return true; }
+    candidates(store).iter().any(|m| (m.slug == requested || m.upstream == requested) && !enabled(store,m))
+        || models(store).iter().any(|m| m.slug == requested && !enabled(store,m))
+}
+
+pub fn resolve_on_account(store: &AccountStore, requested: &str, account_id: &str) -> Option<Model> {
+    configured_on_account(store, requested, account_id).filter(|m| enabled(store,m))
+}
+
+/// Settings/catalog inspection must retain disabled models so they can be enabled again.
+pub fn configured_on_account(store: &AccountStore, requested: &str, account_id: &str) -> Option<Model> {
+    let logical=crate::model_routes::logical_model(requested);
+    if !requested.starts_with(PREFIX) && logical.starts_with("gemini-") {
+        let account=store.accounts.get(account_id)?;
+        let mapped=account.relay_model_map.as_ref().and_then(|m|m.get(logical));
+        if mapped.is_none_or(|m|crate::antigravity::models::gemini_family(m)==logical) {
+            let items=candidates(store);
+            let variants:Vec<_>=items.iter().filter(|m|m.account_id==account_id&&normalized_upstream(m)==logical).map(|m|m.upstream.clone()).collect();
+            if let Some(mut bound)=items.into_iter().find(|m|m.account_id==account_id&&normalized_upstream(m)==logical) {
+                bound.variants=variants;bound.upstream=logical.to_owned();bound.slug=requested.to_owned();return Some(bound);
+            }
+        }
+    }
+    if let Some(selected)=models(store).into_iter().find(|m|m.local_agy && (m.slug==requested || m.upstream==requested)) {
+        if selected.local_agy {
+            let items=candidates(store);
+            let mut bound=items.iter().find(|m|m.local_agy && m.account_id==account_id && normalized_upstream(m)==selected.upstream)?.clone();
+            bound.variants=items.iter().filter(|m|m.local_agy && m.account_id==account_id && normalized_upstream(m)==selected.upstream).map(|m|m.upstream.clone()).collect();
+            bound.upstream=selected.upstream;bound.slug=requested.to_owned();return Some(bound);
+        }
+    }
+    let upstream = if requested.starts_with(PREFIX) {
+        resolve(store, requested)?.upstream
     } else {
-        items.iter().find(|m| m.slug == slug)?.upstream.as_str()
+        let requested=requested.strip_prefix(CURRENT_PREFIX).unwrap_or(requested);
+        let account = store.accounts.get(account_id)?;
+        account.relay_model_map.as_ref().and_then(|m| m.get(requested))
+            .cloned().unwrap_or_else(|| requested.to_owned())
     };
-    let mut model = choose(store, &items, upstream)?.clone();
-    model.slug = slug.to_owned();
-    Some(model)
+    // No generic model_fallback: a session binding must not silently downgrade.
+    candidates(store).into_iter().find(|m| m.account_id == account_id && m.upstream == upstream)
+}
+
+pub fn native_failover_candidates(store: &AccountStore, selected: &Model) -> Vec<Model> {
+    let Some(policy) = store.settings.model_route_policies.get(&selected.upstream) else { return Vec::new() };
+    if !policy.enabled || !policy.auto_switch || selected.protocol != "responses" || selected.local_agy
+        || !policy.allowed_sources.contains(&selected.account_id) { return Vec::new() }
+    candidates(store).into_iter().filter(|m| {
+        m.account_id != selected.account_id && m.upstream == selected.upstream
+            && m.protocol == selected.protocol && !m.local_agy
+            && policy.allowed_sources.contains(&m.account_id)
+    }).collect()
 }
 
 pub fn catalog_entry(model: &Model, template: Option<&Value>) -> Value {
@@ -419,11 +484,16 @@ pub fn catalog_entry(model: &Model, template: Option<&Value>) -> Value {
         "upgrade":null,"availability_nux":null,"deprecation":null,"retirement_at":null,
         "prefer_websockets":false,"supports_websockets":false,"use_responses_lite":false,
         "tool_mode":null,"shell_type":"shell_command","apply_patch_tool_type":"freeform",
+        "truncation_policy":{"mode":"bytes","limit":10000},
         "multi_agent_version":"v2","supports_parallel_tool_calls":true,
         // Do not inherit GPT hosted discovery: when false Codex exposes MCP
         // functions directly instead of emitting unsupported tool_search specs.
         "supports_search_tool":false,"experimental_supported_tools":[],
-        "supported_reasoning_levels":if model.local_agy {
+        "supported_reasoning_levels":if model.upstream.starts_with("gemini-") && !model.variants.is_empty() {
+            json!( ["minimal","low","medium","high"].iter().filter(|effort|
+                model.variants.iter().any(|id|id==&model.upstream || crate::antigravity::models::preset_effort(id)==Some(**effort)))
+                .map(|effort|json!({"effort":effort,"description":effort})).collect::<Vec<_>>() )
+        } else if model.local_agy {
             json!([{"effort":"low","description":"Low"},{"effort":"medium","description":"Medium"},{"effort":"high","description":"High"}])
         } else if kimi || deepseek || coding_k3 {
             json!([{"effort":"low","description":"Low"},{"effort":"high","description":"High"},{"effort":"max","description":"Max"}])
@@ -477,26 +547,21 @@ pub fn request_body(raw: &[u8], model: &Model) -> Result<Vec<u8>, String> {
     let requested_effort = value
         .pointer("/reasoning/effort")
         .or_else(|| value.get("reasoning_effort"))
-        .and_then(Value::as_str);
-    let actual_model = if model.local_agy && !model.variants.is_empty() {
+        .and_then(Value::as_str)
+        .or_else(||value["model"].as_str().and_then(|id|crate::antigravity::models::preset_effort(id.strip_prefix(CURRENT_PREFIX).unwrap_or(id))));
+    let actual_model = if model.upstream.starts_with("gemini-") && !model.variants.is_empty() {
+        crate::antigravity::models::gemini_variant(model.variants.iter().map(String::as_str),&model.upstream,requested_effort,false)
+            .ok_or("The bound source does not provide the selected Gemini reasoning preset")?
+    } else if model.local_agy && model.variants.iter().any(|id| ["-low","-medium","-high"].iter().any(|s|id.ends_with(s))) {
         let suffix = match requested_effort {
             Some("low") => "-low",
             Some("medium") => "-medium",
-            _ => "-high",
+            Some("high") | None => "-high",
+            Some(_) => return Err("This local bridge has no matching reasoning preset; refusing to change effort".into()),
         };
-        model
-            .variants
-            .iter()
-            .find(|id| id.ends_with(suffix))
-            .cloned()
-            .or_else(|| {
-                model
-                    .variants
-                    .iter()
-                    .find(|id| id.ends_with("-high"))
-                    .cloned()
-            })
-            .unwrap_or_else(|| model.variants[0].clone())
+        model.variants.iter().find(|id| id.ends_with(suffix)).cloned()
+            .or_else(|| requested_effort.is_none().then(||model.variants.first().cloned()).flatten())
+            .ok_or("The bound source does not provide the selected reasoning preset")?
     } else {
         model.upstream.clone()
     };

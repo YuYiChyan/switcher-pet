@@ -55,7 +55,7 @@ pub struct SessionRoutesStore {
 impl SessionRoutesStore {
     /// 磁盘路径：`~/.codex-switcher/session_routes.json`
     pub fn config_path() -> PathBuf {
-        dirs::home_dir()
+        crate::app_paths::profile_home()
             .expect("无法获取用户目录")
             .join(".codex-switcher")
             .join("session_routes.json")

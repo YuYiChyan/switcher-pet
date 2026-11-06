@@ -11,6 +11,22 @@ use serde_json::Value;
 
 /// 应用全局设置
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelRoutePolicy {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_true")]
+    pub visible: bool,
+    #[serde(default)]
+    pub auto_switch: bool,
+    #[serde(default)]
+    pub allowed_sources: Vec<String>,
+}
+impl Default for ModelRoutePolicy {
+    fn default() -> Self { Self { enabled: true, visible: true, auto_switch: false, allowed_sources: Vec::new() } }
+}
+
+/// Settings for independently selected models, never an implicit model fallback.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
     /// 是否在切换账号后自动重载 IDE
     #[serde(default)]
@@ -128,6 +144,16 @@ pub struct AppSettings {
     /// Native Relay current account, independently keyed by upstream model ID.
     #[serde(default)]
     pub current_relay_accounts: HashMap<String, String>,
+    #[serde(default)]
+    pub current_google_accounts: HashMap<String, String>,
+    #[serde(default)]
+    pub current_model_sources: HashMap<String, String>,
+    #[serde(default)]
+    pub model_route_policies: HashMap<String, ModelRoutePolicy>,
+    #[serde(default)]
+    pub pool_settings: crate::pool_math::PoolSettings,
+    #[serde(default)]
+    pub pet_preferences: crate::pet_preferences::Preferences,
 
     /// client 模式下，同步到 Server 时要跳过的 skill 目录名
     #[serde(default)]
@@ -256,7 +282,7 @@ pub const SOLO_HEARTBEAT_INTERVAL_SECS: u64 = 120;
 pub const SOLO_HEARTBEAT_TTL_SECS: i64 = 300;
 
 fn default_remote_server_port() -> u16 {
-    18081
+    28181
 }
 
 fn default_remote_server_bind() -> String {
@@ -295,6 +321,11 @@ impl Default for AppSettings {
             remote_shared_secret: String::new(),
             current_antigravity_account_id: None,
             current_relay_accounts: HashMap::new(),
+            current_google_accounts: HashMap::new(),
+            current_model_sources: HashMap::new(),
+            model_route_policies: HashMap::new(),
+            pool_settings: crate::pool_math::PoolSettings::default(),
+            pet_preferences: crate::pet_preferences::Preferences::default(),
             skills_sync_blacklist: Vec::new(),
             skills_auto_pull: false,
             solo_auto_sync_current: true,
@@ -465,6 +496,7 @@ impl Account {
     /// 解析有效 kind：`Legacy` 时按 token 前缀派生
     pub fn effective_kind(&self) -> AccountKind {
         match self.kind {
+            AccountKind::Legacy if self.auth_json.get("provider").and_then(Value::as_str)==Some("antigravity") => AccountKind::AntigravityOauth,
             AccountKind::Legacy => match AccountStore::extract_access_token(&self.auth_json) {
                 Some(tok) if tok.starts_with("eyJ") => AccountKind::ChatgptOauth,
                 Some(_) => AccountKind::OpenaiKey,
@@ -613,6 +645,10 @@ impl Default for KeepaliveState {
 /// 中转站账号的余额缓存（与 `CachedQuota` 平行；语义上一个是 USD 余额，一个是 5h+周窗口）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RelayUsageCache {
+    #[serde(default)]
+    pub balance_capacity: Option<f64>,
+    #[serde(default)]
+    pub balance_capacity_estimated: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub windows: Vec<RelayQuotaWindow>,
     /// 剩余额度（原始数值；单位看 `unit`）
@@ -626,6 +662,15 @@ pub struct RelayUsageCache {
     pub next_reset_at: Option<i64>,
     /// 抓取时刻
     pub updated_at: DateTime<Utc>,
+}
+impl RelayUsageCache {
+    pub fn preserve_reference(&mut self,previous:Option<&Self>) {
+        if self.balance_capacity.is_some(){return;}
+        let previous=previous.filter(|p|p.unit==self.unit);
+        let reference=previous.and_then(|p|p.balance_capacity).unwrap_or_else(||previous.map(|p|p.remaining).unwrap_or(0.0)).max(self.remaining);
+        self.balance_capacity=(reference.is_finite()&&reference>0.0).then_some(reference);
+        self.balance_capacity_estimated=true;
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -775,12 +820,7 @@ fn write_text_secure(path: &Path, content: &str) -> Result<(), String> {
 }
 
 fn codex_switcher_home_dir() -> PathBuf {
-    #[cfg(debug_assertions)]
-    if let Some(path) = std::env::var_os("CODEX_SWITCHER_TEST_HOME") {
-        return PathBuf::from(path);
-    }
-
-    dirs::home_dir().expect("无法获取用户目录")
+    crate::app_paths::profile_home().expect("无法获取用户目录")
 }
 
 impl AccountStore {

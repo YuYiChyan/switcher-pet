@@ -25,4 +25,26 @@ dist-ssr
 
 # Rust/Tauri
 src-tauri/target
-docs/
+tests/isolation-harness/target/
+tests/compat-harness/target/
+docs/*
+!docs/SELFUSE_PRODUCT_DESIGN.zh-CN.md
+!docs/SELFUSE_AUDIT.zh-CN.md
+!docs/SELFUSE_ASSETS.json
+
+# Self-use fork: never commit live credentials, copied stores or runtime data.
+.selfuse-data/
+.tooling/
+.env
+.env.*
+accounts.json*
+auth.json*
+session_routes.json
+quota-snapshots.jsonl
+token-history.jsonl
+switch-history.jsonl
+*.dpapi
+*.zip
+profile/
+backups/
+imports/

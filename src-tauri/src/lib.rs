@@ -3,6 +3,14 @@
 //! 暴露所有 Tauri 命令供前端调用
 
 pub mod account;
+mod app_paths;
+mod model_routes;
+mod pool_math;
+mod pool_api;
+mod source_probe;
+mod pet;
+mod pet_preferences;
+mod activity_scan;
 mod anchor_recovery;
 mod antigravity;
 mod bulk_import;
@@ -329,6 +337,11 @@ fn update_settings(
         settings.current_antigravity_account_id =
             store.settings.current_antigravity_account_id.clone();
         settings.current_relay_accounts = store.settings.current_relay_accounts.clone();
+        settings.current_google_accounts = store.settings.current_google_accounts.clone();
+        settings.current_model_sources = store.settings.current_model_sources.clone();
+        settings.model_route_policies = store.settings.model_route_policies.clone();
+        settings.pool_settings = store.settings.pool_settings.clone();
+        settings.pet_preferences = store.settings.pet_preferences.clone();
         let prev = (
             store.settings.background_refresh,
             store.settings.proxy_enabled,
@@ -744,13 +757,25 @@ fn bulk_import_accounts(
     };
     {
         let mut store = state.store.lock().map_err(|e| e.to_string())?;
-        let existing_emails: std::collections::HashSet<String> =
+        let mut existing_emails: std::collections::HashSet<String> =
             store.accounts.values().map(|a| a.name.clone()).collect();
         for p in &all_parsed {
             if existing_emails.contains(&p.email) {
                 continue;
             }
-            let acc = store.add_account(p.email.clone(), p.auth_json.clone(), None);
+            let mut acc = store.add_account(p.email.clone(), p.auth_json.clone(), None);
+            if let Some(native) = &p.native {
+                let new_id = acc.id.clone();
+                acc = native.clone();
+                acc.id = new_id;
+                // Import never transfers live OAuth refresh ownership or priming.
+                acc.is_session_anchor = false;
+                acc.keepalive.inactive_refresh_enabled = false;
+                acc.window_priming.five_hour_enabled = false;
+                acc.window_priming.weekly_enabled = false;
+                store.accounts.insert(acc.id.clone(), acc.clone());
+            }
+            existing_emails.insert(p.email.clone());
             newly_added_ids.push(acc.id.clone());
             info.push(bulk_import::BulkParsedAccountInfo {
                 email: p.email.clone(),
@@ -762,6 +787,10 @@ fn bulk_import_accounts(
         store.save()?;
     }
     crate::tray::update_tray_menu(&app);
+
+    // Every local surface must refresh after import, including the pet and
+    // unified model selector; remote mode is not a prerequisite for this event.
+    let _ = app.emit("accounts-updated", ());
 
     // client / solo 模式：把新导入的账号推到 Server，让 Server 接管刷新 + 配额查询
     // 否则后续 UI 刷新会调 remote_refresh_account_quota → Server 找不到账号
@@ -937,6 +966,8 @@ async fn refresh_relay_models(
             return Err("账号在刷新模型时发生变化".to_string());
         }
         account.relay_model_catalog = models.clone();
+        account.is_token_invalid = false;
+        account.keepalive.last_error = None;
         relay_catalog::ensure_currents(&mut store);
         store.save()?;
     }
@@ -1028,7 +1059,7 @@ async fn refresh_relay_usage(
         preset
     };
 
-    let cache = match effective_preset.as_deref() {
+    let mut cache = match effective_preset.as_deref() {
         Some("openai_compat") => {
             UsageFetcher::fetch_relay_usage_openai_compat(&base_url, &api_key).await?
         }
@@ -1053,6 +1084,7 @@ async fn refresh_relay_usage(
     {
         let mut store = state.store.lock().map_err(|e| e.to_string())?;
         if let Some(acc) = store.accounts.get_mut(&id) {
+            cache.preserve_reference(acc.relay_usage_cache.as_ref());
             acc.relay_usage_cache = Some(cache.clone());
             store.save()?;
         }
@@ -1335,6 +1367,9 @@ fn switch_relay_model_account(
     {
         let mut store = state.store.lock().map_err(|e| e.to_string())?;
         relay_catalog::select_current(&mut store, &id, model.as_deref())?;
+        if let Some(model)=model.as_ref().filter(|model|store.settings.current_model_sources.contains_key(*model)) {
+            store.settings.current_model_sources.insert(model.clone(),id.clone());
+        }
         store.save()?;
     }
     let _ = app.emit("accounts-updated", ());
@@ -2309,6 +2344,12 @@ fn start_antigravity_catalog_refresh(
 ) -> tauri::async_runtime::JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
         loop {
+            // The fork must not refresh imported Google OAuth tokens merely
+            // because a desktop window was opened. Honor the explicit switch.
+            if !store.lock().map(|s|s.settings.background_refresh).unwrap_or(false) {
+                tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+                continue;
+            }
             let google_remote = store.lock().ok().and_then(|store| {
                 (store.settings.remote_mode == "client").then(|| {
                     (
@@ -2411,6 +2452,14 @@ pub fn start_quota_refresh(
         println!("[QuotaRefresh] 定时额度刷新已启动");
 
         loop {
+            // Disabled means disabled, including automatic priming defaults and
+            // Plus watchers. API GET probes have their own independent controls.
+            let paused=store.lock().map(|s|!s.settings.background_refresh
+                && !s.settings.quota_refresh_enabled && s.settings.remote_mode=="off").unwrap_or(true);
+            if paused {
+                tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+                continue;
+            }
             let (
                 enabled,
                 interval_minutes,
@@ -3874,7 +3923,7 @@ fn open_codex_terminal(state: State<AppState>, id: String) -> Result<String, Str
     }
 
     // 隔离 CODEX_HOME：~/.codex-switcher/codex-launch/<id>/
-    let home = dirs::home_dir()
+    let home = crate::app_paths::profile_home()
         .ok_or("无法获取用户目录")?
         .join(".codex-switcher")
         .join("codex-launch")
@@ -5142,7 +5191,7 @@ fn get_skill_app_status() -> Result<std::collections::HashMap<String, bool>, Str
 
 #[tauri::command]
 fn get_skill_content(directory: String) -> Result<String, String> {
-    let ssot = dirs::home_dir()
+    let ssot = crate::app_paths::profile_home()
         .unwrap()
         .join(".codex-switcher")
         .join("skills")
@@ -5190,6 +5239,7 @@ fn show_main_window_cmd(app: tauri::AppHandle) {
 /// 杀死所有 codex 相关进程（排除 Codex Switcher 自身）
 #[tauri::command]
 fn kill_codex_processes() -> Result<String, String> {
+    crate::app_paths::deny_live_integration("终止 Codex 进程")?;
     let script = r#"
         killed=0
         for pid in $(pgrep -f codex 2>/dev/null); do
@@ -5221,7 +5271,8 @@ fn kill_codex_processes() -> Result<String, String> {
 /// 设置 OPENAI_BASE_URL 环境变量（终端 + GUI 应用全覆盖）
 #[tauri::command]
 fn set_proxy_env(port: u16, enable: bool) -> Result<String, String> {
-    let home = dirs::home_dir().ok_or("无法获取用户目录")?;
+    crate::app_paths::deny_live_integration("接管全局代理环境")?;
+    let home = crate::app_paths::profile_home().ok_or("无法获取用户目录")?;
     let env_value = format!("http://localhost:{}/v1", port);
     let env_line = format!("export OPENAI_BASE_URL={}", env_value);
     let marker = "# codex-switcher-proxy";
@@ -5286,7 +5337,7 @@ fn set_proxy_env(port: u16, enable: bool) -> Result<String, String> {
 
 /// 读写 ~/.codex/config.toml 的 openai_base_url 字段
 fn set_codex_config_base_url(url: Option<&str>) -> Result<(), String> {
-    let config_path = dirs::home_dir()
+    let config_path = crate::app_paths::profile_home()
         .ok_or("无法获取用户目录")?
         .join(".codex")
         .join("config.toml");
@@ -5349,7 +5400,7 @@ fn set_codex_config_base_url(url: Option<&str>) -> Result<(), String> {
 /// 切换 Codex fast 模式（修改 config.toml 的 profile 字段）
 #[tauri::command]
 fn set_codex_fast_mode(enable: bool) -> Result<String, String> {
-    let config_path = dirs::home_dir()
+    let config_path = crate::app_paths::profile_home()
         .ok_or("无法获取用户目录")?
         .join(".codex")
         .join("config.toml");
@@ -5396,7 +5447,7 @@ fn set_codex_fast_mode(enable: bool) -> Result<String, String> {
 /// 切换 ~/.codex/config.toml 里的 [features] goals 开关
 #[tauri::command]
 fn set_codex_features_goals(enable: bool) -> Result<String, String> {
-    let config_path = dirs::home_dir()
+    let config_path = crate::app_paths::profile_home()
         .ok_or("无法获取用户目录")?
         .join(".codex")
         .join("config.toml");
@@ -5465,7 +5516,7 @@ fn set_codex_features_goals(enable: bool) -> Result<String, String> {
 /// 读 ~/.codex/config.toml 里的 [features] goals 开关
 #[tauri::command]
 fn get_codex_features_goals() -> Result<bool, String> {
-    let config_path = dirs::home_dir()
+    let config_path = crate::app_paths::profile_home()
         .ok_or("无法获取用户目录")?
         .join(".codex")
         .join("config.toml");
@@ -5494,7 +5545,7 @@ fn get_codex_features_goals() -> Result<bool, String> {
 /// 获取当前 fast 模式状态
 #[tauri::command]
 fn get_codex_fast_mode() -> Result<bool, String> {
-    let config_path = dirs::home_dir()
+    let config_path = crate::app_paths::profile_home()
         .ok_or("无法获取用户目录")?
         .join(".codex")
         .join("config.toml");
@@ -6013,7 +6064,7 @@ struct SkillSyncReport {
 #[tauri::command]
 async fn remote_sync_skills(state: State<'_, AppState>) -> Result<SkillSyncReport, String> {
     let (url, secret) = client_settings_snapshot(&state).await?;
-    let home = dirs::home_dir().ok_or("Cannot resolve current user's home directory")?;
+    let home = crate::app_paths::profile_home().ok_or("Cannot resolve current user's home directory")?;
     let mirrored = skills_pull::managed_roots(&home)?;
     let blacklist: std::collections::HashSet<String> = {
         let store = state.store.lock().map_err(|e| e.to_string())?;
@@ -6072,7 +6123,7 @@ async fn pull_skills_once(store: &std::sync::Arc<std::sync::Mutex<AccountStore>>
     // Keep the primary/fallback pair as one identity: switching network routes is not a new source.
     let source = format!("{}|{}", primary.trim_end_matches('/'), fallback.trim_end_matches('/'));
     tokio::task::spawn_blocking(move || {
-        let home = dirs::home_dir().ok_or("Cannot resolve current user's home directory")?;
+        let home = crate::app_paths::profile_home().ok_or("Cannot resolve current user's home directory")?;
         let report = skills_pull::apply(bundle, &home.join(".codex-switcher/skills"), &home, std::env::consts::OS, &source, &blacklist)?;
         skills::index_pulled_skills(&report)?;
         Ok(report)
@@ -6177,10 +6228,22 @@ fn restore_anchor_disk_on_exit(reason: &str) {
     }
 }
 
+#[tauri::command]
+fn get_isolated_preview_mode() -> bool {
+    app_paths::is_preview()
+}
+
 pub fn run() {
+    let _runtime_guard = match app_paths::prepare_runtime() {
+        Ok(guard) => guard,
+        Err(error) => {
+            eprintln!("Switcher Pet refused to start: {error}");
+            return;
+        }
+    };
     // 把 stdout/stderr 重定向到 ~/.codex-switcher/proxy.log
     // 兼容 GUI 启动（Mac App double-click / Tauri build），让所有 println! / eprintln! 落盘
-    if let Some(home) = dirs::home_dir() {
+    if let Some(home) = crate::app_paths::profile_home() {
         let dir = home.join(".codex-switcher");
         let _ = std::fs::create_dir_all(&dir);
         let log_path = dir.join("proxy.log");
@@ -6212,6 +6275,11 @@ pub fn run() {
         .plugin(tauri_plugin_deep_link::init())
         .manage(AppState::new())
         .setup(|app| {
+            if app_paths::is_preview() {
+                if let Some(window) = app.get_webview_window("main") {
+                    window.set_title("Switcher Pet — 自用开源版")?;
+                }
+            }
             // ── Deep link 监听：codexswitch:// + ccswitch:// ──
             // 收到 URL 后解析，把结果 emit 到前端"deep-link://import-pending"事件，
             // 由前端弹确认框，用户点"导入"才会调 add_relay_account 落库。
@@ -6244,6 +6312,18 @@ pub fn run() {
 
             // 启动后台调度器（仅在设置开启时）
             let state = app.state::<AppState>();
+            source_probe::start(app.handle().clone());
+            activity_scan::start(app.handle().clone());
+            let silent=state.store.lock().map(|s|s.settings.pet_preferences.silent_start).unwrap_or(true);
+            if std::env::args().any(|a|a=="--validation" || a=="--settings") || !silent {
+                if let Some(window)=app.get_webview_window("main"){let _=window.show();}
+            }
+            if !std::env::args().any(|a|a=="--validation") {
+                let handle=app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    if pet::open_pet(handle.clone()).await.is_err(){if let Some(w)=handle.get_webview_window("main"){let _=w.show();}}
+                });
+            }
             // 无论后台保活是否开启，都先修正旧版本已经落盘的明确 refresh-token
             // 终态错误。client/server 两端重启后会得到一致的“需重新登录”状态。
             let reconciled = state
@@ -6323,7 +6403,7 @@ pub fn run() {
                 })
                 .unwrap_or((
                     "off".to_string(),
-                    18081,
+                    28181,
                     "0.0.0.0".to_string(),
                     String::new(),
                 ));
@@ -6437,7 +6517,7 @@ pub fn run() {
                 {
                     eprintln!(
                         "[Config] ⚠️ client 模式但 remote_server_url 为空 —— Server 不可达，本机将退回直连本地账号。\n\
-                         去 设置 → 远程模式 填上 Server 地址（比如 http://192.168.2.14:18081）。"
+                         去 设置 → 远程模式 填上 Server 地址（比如 http://192.168.2.14:28181）。"
                     );
                 }
             }
@@ -6484,6 +6564,23 @@ pub fn run() {
         })
         .invoke_handler({
             let commands: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
+            get_isolated_preview_mode,
+            model_routes::get_model_routes,
+            model_routes::set_model_route_policy,
+            model_routes::set_model_source,
+            pool_api::get_pool_dashboard,
+            pool_api::set_source_policy,
+            source_probe::probe_source_now,
+            pet_preferences::get_pet_preferences,
+            pet_preferences::set_pet_preferences,
+            pet_preferences::get_pet_sound,
+            pet_preferences::import_pet_sound,
+            pet::open_pet,
+            pet::hide_pet,
+            pet::get_pet_activity,
+            pet::drag_pet,
+            pet::resize_pet,
+            pet::pet_menu,
             get_accounts,
             i18n::set_app_locale,
             i18n::get_system_locale,
@@ -6592,6 +6689,9 @@ pub fn run() {
             remote_restart_server,
             ];
             move |invoke: tauri::ipc::Invoke| {
+                if invoke.message.webview().label()=="pet" && !["get_system_locale","set_app_locale","get_pool_dashboard","get_pet_activity","get_pet_preferences","set_pet_preferences","get_pet_sound","pet_menu","drag_pet","resize_pet","hide_pet"].contains(&invoke.message.command()) {
+                    invoke.resolver.reject("The pet surface cannot access account secrets or unrelated application commands.");return true;
+                }
                 if referral_browser::isolated_window(invoke.message.webview().label()) {
                     invoke.resolver.reject("Official referral browser cannot invoke application commands.");
                     true

@@ -393,7 +393,7 @@ export function AccountList({
             if (acc.relay_usage_cache) {
                 initialRelayUsage[acc.id] = acc.relay_usage_cache;
             }
-            if (acc.cached_quota) {
+            if (acc.cached_quota && effectiveKind(acc) === 'chatgpt_oauth') {
                 const isValid = acc.cached_quota.is_valid_for_cli !== false;
                 initialUsage[acc.id] = {
                     five_hour_left: acc.cached_quota.five_hour_left,
@@ -571,6 +571,7 @@ export function AccountList({
         const err = account.keepalive?.last_error;
         const isPermanent = err?.toLowerCase().match(/invalidated|expired|invalid_refresh_token|invalid_grant/);
 
+        if (['relay','openai_key'].includes(effectiveKind(account))) return {text:account.is_token_invalid ? '凭据待检查' : 'API',warn:account.is_token_invalid};
         if (isPermanent) return { text: '过期', warn: true };
         if (isCurrent) return { text: '当前账号', warn: false };
         return { text: err ? '重试中' : '正常', warn: !!err };
@@ -654,10 +655,10 @@ export function AccountList({
                 return;
             }
             // Relay 账号走专属 fetcher（不查 OpenAI usage）
-            if (acc && effectiveKind(acc) === 'relay') {
-                const cache = await invoke<RelayUsageCache>('refresh_relay_usage', { id });
-                setRelayUsageMap(prev => ({ ...prev, [id]: cache }));
-                onRefreshComplete?.();
+            if (acc && ['relay','openai_key'].includes(effectiveKind(acc))) {
+                await invoke('probe_source_now', { id });
+                await onRefreshComplete?.();
+                setInvalidIds(prev => {const next=new Set(prev);next.delete(id);return next;});
                 return;
             }
             const cmd = settings.remote_mode === 'client'
@@ -1059,7 +1060,7 @@ export function AccountList({
                                                 title="手机锚：磁盘 ~/.codex/auth.json 永远跟随此号，Codex.app 手机远程连接绑定此号；切到其他号时 disk 不动、proxy 出口照切"
                                             >📱 手机锚</span>
                                         )}
-                                        {isBanned ? <span className="badge banned" title="该账号已被 OpenAI 封禁">封号</span> : isLoggedOut ? <span className="badge logged-out" title="登录已失效，可能是 refresh_token 过期、被撤销或会话在其他设备结束">需重新登录</span> : isInvalid && <span className="badge expired" title="该账号 Token 已过期或失效">过期</span>}
+                                        {isBanned ? <span className="badge banned" title="该账号已被 OpenAI 封禁">封号</span> : isLoggedOut ? <span className="badge logged-out" title="登录已失效，可能是 refresh_token 过期、被撤销或会话在其他设备结束">需重新登录</span> : isInvalid && <span className="badge expired" title={kind === 'relay' || kind === 'openai_key' ? 'API 凭据需要探测，不代表订阅过期' : '该账号 Token 已过期或失效'}>{kind === 'relay' || kind === 'openai_key' ? '凭据待检查' : '过期'}</span>}
                                         {expiry.badge && <span className={`badge account-expiry ${expiry.tone}`} title={expiry.title}>📅 {expiry.badge}</span>}
                                         {usage?.plan_type && <span className="badge plan">{formatPlanLabel(usage.plan_type)}</span>}
                                         {kind === 'chatgpt_oauth' && usage?.reset_credits == null && (

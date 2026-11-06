@@ -1,0 +1,178 @@
+{
+  "review_date": "2026-11-06",
+  "repositories": [
+    {
+      "asset_license_note": "Not covered by MIT; as-is only for original plugin; no general relicensing grant",
+      "code_license": "MIT",
+      "name": "whale-widget",
+      "installed": false,
+      "assets": [
+        {
+          "bytes": 255988,
+          "path": "assets/DSniang1.png",
+          "sha256": "DCC456613DBB1102A4B7EF636A8B622371E33B763489D6249C434FB54248BA5C"
+        },
+        {
+          "bytes": 6370,
+          "path": "assets/Ya1.mp3",
+          "sha256": "0AD8F934AE5FA3CBD42745E086A56AA6532766618C6A620B860A795BDC7689F9"
+        },
+        {
+          "bytes": 2976,
+          "path": "assets/Ya2.mp3",
+          "sha256": "1A8998077E5E306C3088BB442CE36617261DD58200754F457469A520801C565B"
+        }
+      ],
+      "bundled_in_fork": false,
+      "source": "https://github.com/MeteorNOX/DeepSeek-Balance-Whale-Widget",
+      "commit": "5247dd6813d6e4430728f39ccc63d43cda046022"
+    },
+    {
+      "asset_license_note": "gptniang1.png MIT per PROVENANCE; inherited audio/art restricted upstream",
+      "code_license": "MIT",
+      "name": "gpt-widget",
+      "installed": false,
+      "assets": [
+        {
+          "bytes": 513179,
+          "path": "assets/gptniang1.png",
+          "sha256": "042686F7802A4E3CBC36B9E6FB97CFC952BB72314BB22353EB7A0AC58EFB97DD"
+        }
+      ],
+      "bundled_in_fork": false,
+      "source": "https://github.com/xixingyingmie/dsh-gpt-niang-widget",
+      "commit": "fd0d394d8016be7fc52432bc0a9629d839e06263"
+    },
+    {
+      "asset_license_note": "xiaoke1.png and derived animations CC BY-NC-SA 4.0",
+      "code_license": "MIT",
+      "name": "claude-widget",
+      "installed": false,
+      "assets": [
+        {
+          "bytes": 461395,
+          "path": "assets/xiaoke1.png",
+          "sha256": "A5E51F99CEAFFBD2E1BD3D567D415AF90BF04F07A8545F4416B2BD15C2C90999"
+        },
+        {
+          "bytes": 3981224,
+          "path": "assets/xiaoke-anim-256.webp",
+          "sha256": "D6474645FDA1345D242EF4D613F4C9B577946E06211C8A733073D98F9A6C2A52"
+        }
+      ],
+      "bundled_in_fork": false,
+      "source": "https://github.com/aklnaaw/dsh-xiaoke-widget",
+      "commit": "8e2a207bfc9ae3983168dcc847e54734771bce67"
+    },
+    {
+      "asset_license_note": "CC BY-NC 4.0 artwork; unofficial fan art",
+      "code_license": "MIT scripts and JSON",
+      "name": "chatgpt-chibi-pets",
+      "installed": false,
+      "assets": [
+        {
+          "bytes": 3020366,
+          "path": "chatgpt-white-dragon-chibi-v5/spritesheet.webp",
+          "sha256": "6D7CD4D4A33F2BABDA645DC1CB8B6B719530029B511E126AC6611FA1142A718F"
+        },
+        {
+          "bytes": 2006908,
+          "path": "claude-orange-scholar-chibi-v3/spritesheet.webp",
+          "sha256": "6FF6CE931A8BB97BED33018CA23DA959C5558695740D28BC014D316B5C1CF359"
+        },
+        {
+          "bytes": 3013338,
+          "path": "deepseek-whale-maid-chibi-v4/spritesheet.webp",
+          "sha256": "DF223AE1FE1700073A17619C037503B9B1CE0B8DBB7804B019E44C5E0EB2A335"
+        },
+        {
+          "bytes": 2983780,
+          "path": "gemini-star-cat-chibi-v1/spritesheet.webp",
+          "sha256": "E9B9D65E22271228FBDE34D9A42901746616066B18E90F995D1ACAF4C1E095B2"
+        },
+        {
+          "bytes": 3085784,
+          "path": "grok-gothic-chibi-v1/spritesheet.webp",
+          "sha256": "A7D283A24EB03075FE4E3292646C135C1FB59D4A934C40FA301DDD64DED7C4DC"
+        },
+        {
+          "bytes": 2295040,
+          "path": "kimi-moon-maid-chibi-v2/spritesheet.webp",
+          "sha256": "5B3D882E7A1509861F1757BABC7073A01E4C91B2CDAE81BBCA1AFCC899E12B61"
+        },
+        {
+          "bytes": 3158838,
+          "path": "qwen-chibi-scholar-v3/spritesheet.webp",
+          "sha256": "E55BF0EB031B77C0135741286D17E85A2588CB476C3D4EEF0817004FE772C2AA"
+        },
+        {
+          "bytes": 2739028,
+          "path": "zhipu-chibi-tech-v2/spritesheet.webp",
+          "sha256": "2296FA87437ED4BD4BF65AF20D95454016928B1F29A2A006DB57EF581A64A12B"
+        }
+      ],
+      "bundled_in_fork": true,
+      "source": "https://github.com/fywdy/chatgpt-chibi-pets",
+      "commit": "d5bbb27c79e5c08e8b8ab44d4023cd35a67418e2",
+      "bundled_subset": "Only qa/previews/idle.webp for each character; see bundled_idle_previews. Reference sprite sheets are not bundled."
+    }
+  ],
+  "purpose": "Source review plus eight unchanged CC BY-NC 4.0 idle previews bundled for personal noncommercial desktop use; no plugin scripts executed, no restricted whale audio copied",
+  "bundled_idle_previews": {
+    "author": "fywdy",
+    "modified": false,
+    "assets": [
+      {
+        "sha256": "E8B01D78F8B92C12EDB60A4D00D1834A99BD098850D0948BED7738C65C234365",
+        "family": "grok",
+        "file": "grok.webp",
+        "source_path": "grok-gothic-chibi-v1/qa/previews/idle.webp"
+      },
+      {
+        "sha256": "805542C9532B3E75D895CB83CBAADFA735B4A4D22BCF63CA0EF166B561D65977",
+        "family": "deepseek",
+        "file": "deepseek.webp",
+        "source_path": "deepseek-whale-maid-chibi-v4/qa/previews/idle.webp"
+      },
+      {
+        "sha256": "BC8AD881BB13B3530E81C60110DCE3544BC1C59948F72588C29485F2DAE21084",
+        "family": "claude",
+        "file": "claude.webp",
+        "source_path": "claude-orange-scholar-chibi-v3/qa/previews/idle.webp"
+      },
+      {
+        "sha256": "F8376FC0E274B91C8E564C9A8787D3B99417C7963223CE1963155FE60ACFAD29",
+        "family": "kimi",
+        "file": "kimi.webp",
+        "source_path": "kimi-moon-maid-chibi-v2/qa/previews/idle.webp"
+      },
+      {
+        "sha256": "B976DA60115F7AC2EA916E2D669B05E155F268984763CF5A75E9C7016EDA2E96",
+        "family": "qwen",
+        "file": "qwen.webp",
+        "source_path": "qwen-chibi-scholar-v3/qa/previews/idle.webp"
+      },
+      {
+        "sha256": "61DF3BAFF454489DBDCF30E4E58220064C7309CA7A78EF1A82CE52C19C04CAF3",
+        "family": "gpt",
+        "file": "gpt.webp",
+        "source_path": "chatgpt-white-dragon-chibi-v5/qa/previews/idle.webp"
+      },
+      {
+        "sha256": "B314BCE1A53950072824656D04C9FDAB8BFFFCCAB1549E34DD326E632F4CB30C",
+        "family": "glm",
+        "file": "glm.webp",
+        "source_path": "zhipu-chibi-tech-v2/qa/previews/idle.webp"
+      },
+      {
+        "sha256": "40BD981ADEB20D28F2DD756AD28C325BD30B64B0E7A17912AC4EF4B4A7330D40",
+        "family": "gemini",
+        "file": "gemini.webp",
+        "source_path": "gemini-star-cat-chibi-v1/qa/previews/idle.webp"
+      }
+    ],
+    "commit": "d5bbb27c79e5c08e8b8ab44d4023cd35a67418e2",
+    "license": "CC BY-NC 4.0",
+    "source": "https://github.com/fywdy/chatgpt-chibi-pets"
+  }
+}

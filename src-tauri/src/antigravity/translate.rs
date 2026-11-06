@@ -29,6 +29,14 @@ pub fn responses_to_antigravity(
             }
         }
     }
+    if let Some(tools)=chat.get_mut("tools").and_then(Value::as_array_mut) {
+        for tool in tools {
+            if let Some(schema)=tool.pointer_mut("/function/parameters") {
+                let root=schema.clone();
+                *schema=expand_schema_refs(&root,&root,&mut Vec::new(),&mut 10000,false)?;
+            }
+        }
+    }
     let mut request = chat_to_gemini_request(&chat)?;
     if let Some(choice) = normalized.get("tool_choice").filter(|v| !v.is_null()) {
         let config = match choice.as_str() {
@@ -80,6 +88,17 @@ pub fn responses_to_antigravity(
 }
 
 fn apply_thinking_config(request: &mut Value, original: &Value, model: &str) -> Result<(), String> {
+    let metadata = super::models::model_for_id(model)
+        .ok_or_else(|| format!("Unknown Antigravity model: {model}"))?;
+    let explicit_max = original.get("max_output_tokens").filter(|v| !v.is_null())
+        .map(|value| value.as_u64().filter(|v| *v > 0)
+            .ok_or_else(|| "max_output_tokens must be a positive integer".to_string()))
+        .transpose()?;
+    let max_output = explicit_max.unwrap_or(metadata.max_completion_tokens)
+        .min(metadata.max_completion_tokens);
+    if explicit_max.is_some() {
+        request["generationConfig"] = json!({"maxOutputTokens":max_output});
+    }
     let effort = original
         .pointer("/reasoning/effort")
         .or_else(|| original.get("reasoning_effort"));
@@ -89,8 +108,6 @@ fn apply_thinking_config(request: &mut Value, original: &Value, model: &str) -> 
     let effort = effort
         .as_str()
         .ok_or_else(|| "reasoning.effort must be a string".to_string())?;
-    let metadata = super::models::model_for_id(model)
-        .ok_or_else(|| format!("Unknown Antigravity model: {model}"))?;
     if !metadata.thinking_levels.contains(&effort) {
         return Err(format!(
             "{model} supports reasoning effort: {}",
@@ -118,14 +135,6 @@ fn apply_thinking_config(request: &mut Value, original: &Value, model: &str) -> 
         };
         json!({"thinkingBudget": budget, "includeThoughts": include_thoughts})
     };
-    let max_output = match original.get("max_output_tokens").filter(|v| !v.is_null()) {
-        Some(value) => value
-            .as_u64()
-            .filter(|v| *v > 0)
-            .ok_or_else(|| "max_output_tokens must be a positive integer".to_string())?,
-        None => metadata.max_completion_tokens,
-    }
-    .min(metadata.max_completion_tokens);
     if model.starts_with("claude-")
         && max_output <= thinking["thinkingBudget"].as_u64().unwrap_or(0)
     {
@@ -285,7 +294,11 @@ fn append_content_parts(content: Option<&Value>, out: &mut Vec<Value>) {
                             .and_then(|value| value.get("url").or(Some(value)))
                             .and_then(Value::as_str)
                         {
-                            out.push(json!({"fileData": {"fileUri": url}}));
+                            if let Some((mime, data)) = url.strip_prefix("data:").and_then(|v| v.split_once(";base64,")) {
+                                out.push(json!({"inlineData": {"mimeType": mime, "data": data}}));
+                            } else {
+                                out.push(json!({"fileData": {"fileUri": url}}));
+                            }
                         }
                     }
                     _ => {}
@@ -304,6 +317,36 @@ fn content_as_text(content: Option<&Value>) -> String {
     }
 }
 
+fn expand_schema_refs(value:&Value,root:&Value,stack:&mut Vec<String>,budget:&mut usize,property_map:bool)->Result<Value,String> {
+    if *budget==0 || stack.len()>48 {return Err("Google tool schema exceeds reference expansion limit".into());}
+    *budget-=1;
+    match value {
+        Value::Array(values)=>values.iter().map(|v|expand_schema_refs(v,root,stack,budget,false)).collect::<Result<Vec<_>,_>>().map(Value::Array),
+        Value::Object(object)=>{
+            if !property_map {
+                if let Some(reference)=object.get("$ref").and_then(Value::as_str) {
+                    let pointer=reference.strip_prefix('#').ok_or("Google tools require local JSON schema references")?;
+                    if stack.iter().any(|v|v==reference){return Err("Recursive Google tool schemas are not supported".into());}
+                    let target=root.pointer(pointer).ok_or("Unresolved Google tool schema reference")?;
+                    stack.push(reference.into());
+                    let mut result=expand_schema_refs(target,root,stack,budget,false)?;
+                    stack.pop();
+                    if let Some(map)=result.as_object_mut(){for (key,v) in object.iter().filter(|(k,_)|k.as_str()!="$ref") {
+                        map.insert(key.clone(),expand_schema_refs(v,root,stack,budget,key=="properties")?);
+                    }}
+                    return Ok(result);
+                }
+            }
+            let mut out=Map::new();
+            for (key,v) in object {
+                if !property_map && ["$defs","definitions"].contains(&key.as_str()){continue;}
+                out.insert(key.clone(),expand_schema_refs(v,root,stack,budget,!property_map && key=="properties")?);
+            }
+            Ok(Value::Object(out))
+        }
+        _=>Ok(value.clone()),
+    }
+}
 fn sanitize_schema_value(value: Value) -> Value {
     sanitize_schema_node(value, false)
 }

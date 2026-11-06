@@ -249,7 +249,7 @@ impl TokenTracker {
     }
 
     fn history_path() -> PathBuf {
-        dirs::home_dir()
+        crate::app_paths::profile_home()
             .expect("home dir")
             .join(".codex-switcher")
             .join("token-history.jsonl")
@@ -270,7 +270,7 @@ impl TokenTracker {
     }
 
     fn stats_path() -> PathBuf {
-        dirs::home_dir()
+        crate::app_paths::profile_home()
             .expect("home dir")
             .join(".codex-switcher")
             .join("proxy-usage.json")

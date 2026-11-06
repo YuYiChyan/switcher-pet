@@ -1,3 +1,9 @@
+# Switcher Pet — 自用开源版
+
+独立桌宠 fork：使用方法、功能边界与素材许可见 [自用版说明](README.selfuse.md)，交付变化见 [版本记录](VERSION_HISTORY.md)。以下为上游项目说明。
+
+---
+
 # Codex Switcher
 
 [![Release](https://img.shields.io/github/v/release/xtftbwvfp/codex-switcher?style=flat-square)](https://github.com/xtftbwvfp/codex-switcher/releases/latest)

@@ -1,9 +1,12 @@
 {
-  "name": "codex-switcher",
+  "name": "switcher-pet",
   "private": true,
   "version": "0.7.21",
   "type": "module",
   "scripts": {
+    "test:selfuse": "node --test scripts/selfuse-isolation.test.mjs",
+    "test:isolation-native": "cargo test --manifest-path tests/isolation-harness/Cargo.toml --locked",
+    "test:compat-native": "cargo test --manifest-path tests/compat-harness/Cargo.toml --locked",
     "dev": "vite",
     "prebuild": "npm run check:i18n",
     "build": "tsc && vite build",

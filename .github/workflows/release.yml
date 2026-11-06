@@ -1,8 +1,7 @@
 name: Release
 on:
-  push:
-    tags:
-      - "v*"
+  # Fork previews are verified and uploaded explicitly. Do not publish the
+  # upstream multi-platform installer matrix automatically on fork tags.
   workflow_dispatch:
 
 jobs:

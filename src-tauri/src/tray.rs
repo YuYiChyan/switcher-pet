@@ -45,6 +45,7 @@ pub fn init(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "tray-show-main" => show_main_window_from_cmd(app),
+            "tray-show-pet" => {let app=app.clone();tauri::async_runtime::spawn(async move {let _=crate::pet::open_pet(app).await;});},
             "tray-next-account" => {
                 let app_handle = app.clone();
                 tauri::async_runtime::spawn(async move {
@@ -94,7 +95,8 @@ fn build_native_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     )?;
     let separator = PredefinedMenuItem::separator(app)?;
     let quit = PredefinedMenuItem::quit(app, Some(crate::i18n::tray_quit()))?;
-    Menu::with_items(app, &[&show_main, &next_account, &separator, &quit])
+    let pet=MenuItem::with_id(app,"tray-show-pet","显示桌宠",true,None::<&str>)?;
+    Menu::with_items(app, &[&pet, &show_main, &next_account, &separator, &quit])
 }
 
 pub fn update_tray_native_menu(app: &AppHandle) -> tauri::Result<()> {

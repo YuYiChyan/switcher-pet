@@ -107,6 +107,7 @@ pub fn parse(payload: &Value) -> Result<RelayUsageCache, String> {
         .filter_map(|w| w.reset_at)
         .min();
     Ok(RelayUsageCache {
+            balance_capacity: None, balance_capacity_estimated:false,
         remaining,
         unit: "% Kimi Code".into(),
         is_active: windows

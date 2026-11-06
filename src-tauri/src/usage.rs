@@ -814,6 +814,7 @@ impl UsageFetcher {
             .unwrap_or_default();
 
         Ok(crate::account::RelayUsageCache {
+            balance_capacity: None, balance_capacity_estimated:false,
             windows,
             remaining,
             unit,
@@ -883,13 +884,14 @@ impl UsageFetcher {
                 .map_err(|e| format!("usage JSON 解析失败: {}", e))?;
             body.get("total_usage")
                 .and_then(|v| v.as_f64())
-                .unwrap_or(0.0)
+                .ok_or("Billing usage response has no total_usage")?
         } else {
-            0.0
+            return Err(format!("Billing usage HTTP {}; keeping the previous balance",usage_resp.status()));
         };
         let remaining_usd = (soft_limit_usd - total_usage_cents / 100.0).max(0.0);
 
         Ok(crate::account::RelayUsageCache {
+            balance_capacity: (soft_limit_usd>0.0).then_some(soft_limit_usd), balance_capacity_estimated:false,
             windows: Vec::new(),
             remaining: remaining_usd,
             unit: "USD".to_string(),
@@ -1065,6 +1067,7 @@ impl UsageFetcher {
             .map(|ms| ms / 1000);
 
         Ok(crate::account::RelayUsageCache {
+            balance_capacity: None, balance_capacity_estimated:false,
             windows: Vec::new(),
             remaining: remaining_pct,
             unit: "%".to_string(),
@@ -1153,6 +1156,7 @@ impl UsageFetcher {
             .and_then(Self::parse_mimo_period_end);
 
         Ok(crate::account::RelayUsageCache {
+            balance_capacity: None, balance_capacity_estimated:false,
             windows: Vec::new(),
             remaining: remaining_pct,
             unit: "% MiMo Credits".to_string(),
@@ -1389,6 +1393,7 @@ impl UsageFetcher {
             .iter()
             .any(|window| window.remaining_percent.is_some_and(|value| value > 0.0));
         Ok(crate::account::RelayUsageCache {
+            balance_capacity: None, balance_capacity_estimated:false,
             windows,
             remaining,
             unit: "% Step Plan Credit".to_string(),

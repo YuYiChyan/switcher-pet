@@ -1,0 +1,19 @@
+.pet-settings {max-width:1060px;margin:0 auto;padding:24px;color:var(--text-primary);}
+.pet-settings h2 {margin:0 0 10px;}
+.pet-settings header p,.pet-settings fieldset p {color:var(--text-secondary);line-height:1.65;font-size:13px;}
+.pet-settings-layout {display:grid;grid-template-columns:240px minmax(0,1fr);gap:32px;margin-top:28px;align-items:start;}
+.pet-settings-preview {position:sticky;top:24px;display:flex;align-items:center;flex-direction:column;text-align:center;padding:24px 12px;border-radius:16px;background:var(--bg-secondary);}
+.pet-settings-preview img {width:180px;height:210px;object-fit:contain;}
+.pet-settings-preview strong {overflow-wrap:anywhere;}
+.pet-settings-preview small {margin-top:20px;color:var(--text-secondary);}
+.pet-settings fieldset {border:0;border-top:1px solid var(--border-color);margin:0 0 28px;padding:16px 0 0;}
+.pet-settings legend {font-size:16px;font-weight:650;padding-right:16px;}
+.pet-settings label {display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.pet-settings input[type=checkbox] {width:16px;height:16px;accent-color:var(--accent-color,#328879);}
+.pet-settings input[type=range] {flex:1;max-width:230px;}
+.pet-settings button,.pet-settings select {color:var(--text-primary);background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;padding:8px 12px;cursor:pointer;}
+.pet-settings button:disabled {opacity:.45;cursor:default;}
+.pet-sound-buttons {display:flex;gap:8px;flex-wrap:wrap;}
+.pet-settings output {font-size:12px;color:var(--text-secondary);}
+.pet-settings :focus-visible {outline:2px solid #328879;outline-offset:3px;}
+@media(max-width:800px){.pet-settings-layout{grid-template-columns:1fr;}.pet-settings-preview{position:static;}.pet-settings-preview img{height:140px;}}

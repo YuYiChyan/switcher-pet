@@ -860,6 +860,7 @@ struct RelayRoute {
 #[derive(Debug, Clone)]
 struct AntigravityRoute {
     account_id: String,
+    upstream_model: String,
     selected_at_start: Option<String>,
     access_token: Option<String>,
     refresh_token: Option<String>,
@@ -917,8 +918,12 @@ fn antigravity_routes(state: &ProxyState, model_id: &str) -> Vec<AntigravityRout
 }
 
 fn antigravity_routes_from_store(store: &AccountStore, model_id: &str) -> Vec<AntigravityRoute> {
+    antigravity_routes_for_effort(store,model_id,None)
+}
+fn antigravity_routes_for_effort(store: &AccountStore, model_id: &str, effort:Option<&str>) -> Vec<AntigravityRoute> {
     let client_mode = store.settings.remote_mode == "client";
-    let selected_id = store.settings.current_antigravity_account_id.as_deref();
+    let selected_id = store.settings.current_google_accounts.get(model_id).map(String::as_str)
+        .or(store.settings.current_antigravity_account_id.as_deref());
     let mut routes: Vec<(bool, f64, Option<chrono::DateTime<Utc>>, AntigravityRoute)> = store
         .accounts
         .values()
@@ -929,9 +934,11 @@ fn antigravity_routes_from_store(store: &AccountStore, model_id: &str) -> Vec<An
                 && !account.is_token_invalid
         })
         .filter_map(|account| {
+            let wire=crate::model_routes::google_upstream(store,&account.id,model_id,effort)
+                .or_else(||account.auth_json.get("model_quotas").and_then(|q|q.as_object()).is_none_or(|q|q.is_empty()).then(||model_id.to_owned()))?;
             let quota_score = crate::antigravity::quota::model_candidate_score(
                 &account.auth_json,
-                model_id,
+                &wire,
                 Utc::now(),
             )?;
             if let Some(quotas) = account
@@ -939,7 +946,7 @@ fn antigravity_routes_from_store(store: &AccountStore, model_id: &str) -> Vec<An
                 .get("model_quotas")
                 .and_then(serde_json::Value::as_object)
             {
-                if !quotas.is_empty() && !quotas.contains_key(model_id) {
+                if !quotas.is_empty() && !quotas.contains_key(&wire) {
                     return None;
                 }
             }
@@ -953,7 +960,7 @@ fn antigravity_routes_from_store(store: &AccountStore, model_id: &str) -> Vec<An
                 .and_then(serde_json::Value::as_str)
                 .or(account.refresh_token.as_deref())
                 .map(ToOwned::to_owned);
-            if !client_mode && (access_token.is_none() || refresh_token.is_none()) {
+            if !client_mode && access_token.is_none() {
                 return None;
             }
             Some((
@@ -962,6 +969,7 @@ fn antigravity_routes_from_store(store: &AccountStore, model_id: &str) -> Vec<An
                 account.last_used,
                 AntigravityRoute {
                     account_id: account.id.clone(),
+                    upstream_model: wire,
                     selected_at_start: selected_id.map(ToOwned::to_owned),
                     access_token,
                     refresh_token,
@@ -1028,13 +1036,12 @@ fn antigravity_models_from_store(
         .flat_map(|account| {
             crate::antigravity::quota::read_model_quotas(&account.auth_json).into_keys()
         });
-    crate::antigravity::models::catalog_from_live_ids(live_ids)
+    crate::antigravity::models::catalog_from_live_ids(live_ids).into_iter()
+        .filter(|m|store.settings.model_route_policies.get(&m.id).is_none_or(|p|p.enabled&&p.visible)).collect()
 }
 
 fn antigravity_model_available(state: &ProxyState, id: &str) -> bool {
-    antigravity_models_for_state(state)
-        .iter()
-        .any(|model| model.id == id)
+    state.store.lock().map(|s|s.accounts.keys().any(|account|crate::model_routes::google_supports(&s,account,id))).unwrap_or(false)
 }
 
 fn antigravity_remote_urls(store: &AccountStore) -> (String, String) {
@@ -1093,6 +1100,10 @@ async fn refresh_antigravity_route_if_needed(
         return Ok(route);
     }
 
+    if let Some(lease)=crate::antigravity::lease::original_owner(&route.account_id,route.refresh_token.as_deref(),&route.project_id) {
+        let lease=lease?;route.access_token=Some(lease.access_token);route.expires_at=Some(lease.expires_at);
+        return Ok(route);
+    }
     let refresh_needed = route
         .expires_at
         .map(|expires| expires <= Utc::now() + chrono::Duration::minutes(5))
@@ -1207,8 +1218,11 @@ async fn handle_antigravity_response(
     method: Method,
     path_and_query: &str,
     body: Bytes,
+    worker: bool,
+    bound_account: Option<String>,
 ) -> Response<ProxyBody> {
     let path = path_and_query.split('?').next().unwrap_or("");
+    if is_responses_compact_path(path) {return error_response(StatusCode::NOT_IMPLEMENTED,"Google models do not support opaque Responses compaction; no quota was consumed");}
     if method != Method::POST || !(path == "/v1/responses" || path.ends_with("/responses")) {
         return error_response(
             StatusCode::NOT_FOUND,
@@ -1220,7 +1234,21 @@ async fn handle_antigravity_response(
         .ok()
         .and_then(|value| value.get("stream").and_then(serde_json::Value::as_bool))
         .unwrap_or(false);
-    let routes = antigravity_routes(&state, &model);
+    let value:serde_json::Value=serde_json::from_slice(&body).unwrap_or_default();
+    let effort=value.pointer("/reasoning/effort").or_else(||value.get("reasoning_effort")).and_then(|v|v.as_str());
+    let mut routes=state.store.lock().map(|s|antigravity_routes_for_effort(&s,&model,effort)).unwrap_or_default();
+    let source_bound=value.get("previous_response_id").is_some_and(|v|!v.is_null()) ||
+        value.get("input").and_then(|v|v.as_array()).is_some_and(|items|items.iter().any(|i|
+            i.get("encrypted_content").is_some() || i["type"]=="compaction"));
+    if let Some(id)=&bound_account { routes.retain(|r|&r.account_id==id); }
+    else if let Ok(store)=state.store.lock() {
+        let selected=store.settings.current_google_accounts.get(&model).cloned().or_else(||
+            store.settings.current_antigravity_account_id.clone().filter(|id|crate::model_routes::google_supports(&store,id,&model)))
+            .or_else(||routes.first().map(|r|r.account_id.clone()));
+        let policy=crate::model_routes::route_policy(&store,&model);
+        routes.retain(|r|selected.as_ref()==Some(&r.account_id) ||
+            (!source_bound && policy.is_some_and(|p|p.auto_switch && p.allowed_sources.contains(&r.account_id))));
+    }
     if routes.is_empty() {
         return error_response(
             StatusCode::TOO_MANY_REQUESTS,
@@ -1235,13 +1263,13 @@ async fn handle_antigravity_response(
             Ok(route) => route,
             Err(error) => {
                 last_error = error;
-                continue;
+                return error_response(StatusCode::BAD_GATEWAY,&last_error);
             }
         };
         let (payload, mut translator_state) =
             match crate::antigravity::translate::responses_to_antigravity(
                 &body,
-                &model,
+                &route.upstream_model,
                 &route.project_id,
             ) {
                 Ok(value) => value,
@@ -1251,14 +1279,13 @@ async fn handle_antigravity_response(
             Ok(client) => client,
             Err(error) => return error_response(StatusCode::INTERNAL_SERVER_ERROR, &error),
         };
-        let user_agent = crate::antigravity::native::request_user_agent(&antigravity_client).await;
-        let endpoint = if stream {
-            crate::antigravity::native::STREAM_URL
-        } else {
-            crate::antigravity::native::GENERATE_URL
-        };
+        let source=state.store.lock().ok().and_then(|s|s.accounts.get(&route.account_id).map(|a|a.name.clone())).unwrap_or_else(||"Google".into());
+        crate::pet::record(&state.app_handle,&model,&source,&route.account_id,worker);
+        let endpoint=crate::antigravity::native::generate_endpoint(stream,&route.project_id);
+        let user_agent=if endpoint.starts_with("http://127.0.0.1:"){"switcher-pet-validation".into()}
+            else {crate::antigravity::native::request_user_agent(&antigravity_client).await};
         let mut response = match antigravity_client
-            .post(endpoint)
+            .post(&endpoint)
             .bearer_auth(route.access_token.as_deref().unwrap_or_default())
             .header("content-type", "application/json")
             .header("user-agent", user_agent)
@@ -1269,20 +1296,20 @@ async fn handle_antigravity_response(
             Ok(response) => response,
             Err(error) => {
                 last_error = format!("Antigravity request failed: {error}");
-                continue;
+                return error_response(StatusCode::BAD_GATEWAY,&last_error);
             }
         };
-        if response.status() == reqwest::StatusCode::UNAUTHORIZED && route.refresh_token.is_none() {
+        if response.status() == reqwest::StatusCode::UNAUTHORIZED && state.store.lock().map(|s|s.settings.remote_mode=="client").unwrap_or(false) {
             remote_antigravity_token_cache_remove(&route.account_id);
             route = match force_remote_antigravity_route(&state, route).await {
                 Ok(route) => route,
                 Err(error) => {
                     last_error = format!("Server Google token force refresh failed: {error}");
-                    continue;
+                    return error_response(StatusCode::UNAUTHORIZED,&last_error);
                 }
             };
             response = match antigravity_client
-                .post(endpoint)
+                .post(&endpoint)
                 .bearer_auth(route.access_token.as_deref().unwrap_or_default())
                 .header("content-type", "application/json")
                 .header(
@@ -1296,17 +1323,19 @@ async fn handle_antigravity_response(
                 Ok(response) => response,
                 Err(error) => {
                     last_error = format!("Antigravity retry failed: {error}");
-                    continue;
+                    return error_response(StatusCode::BAD_GATEWAY,&last_error);
                 }
             };
         }
         let status = response.status();
         if status.as_u16() == 429 {
             last_status = StatusCode::TOO_MANY_REQUESTS;
+            let retry=response.headers().get("retry-after").and_then(|v|v.to_str().ok()).and_then(|s|
+                s.parse::<i64>().ok().or_else(||chrono::DateTime::parse_from_rfc2822(s).ok().map(|t|t.timestamp()-Utc::now().timestamp()))).unwrap_or(60);
             let _ = response.bytes().await;
             if let Ok(mut store) = state.store.lock() {
                 if let Some(account) = store.accounts.get_mut(&route.account_id) {
-                    crate::antigravity::quota::mark_model_exhausted(&mut account.auth_json, &model);
+                    crate::antigravity::quota::mark_model_exhausted_for(&mut account.auth_json, &route.upstream_model,retry);
                 }
                 let _ = store.save();
             }
@@ -1315,7 +1344,8 @@ async fn handle_antigravity_response(
         }
         if !status.is_success() {
             last_status = status;
-            let error_body = response.text().await.unwrap_or_default();
+            let mut error_body = response.text().await.unwrap_or_default();
+            for secret in [route.access_token.as_deref(),route.refresh_token.as_deref()].into_iter().flatten().filter(|s|!s.is_empty()) {error_body=error_body.replace(secret,"[credential]");}
             let preview: String = error_body.chars().take(500).collect();
             last_error = format!("Antigravity upstream returned HTTP {status}: {preview}");
             // Invalid request shape is not an account problem. Do not send the
@@ -1323,13 +1353,13 @@ async fn handle_antigravity_response(
             if status == reqwest::StatusCode::BAD_REQUEST {
                 return error_response(StatusCode::BAD_REQUEST, &last_error);
             }
-            continue;
+            return error_response(status,&last_error);
         }
         let selection_changed = if let Ok(mut store) = state.store.lock() {
-            let changed = store.adopt_antigravity_after_success(
-                &route.account_id,
-                route.selected_at_start.as_deref(),
-            );
+            let changed = bound_account.is_none() && !worker &&
+                store.settings.current_google_accounts.get(&model).map(String::as_str)
+                    .or(store.settings.current_antigravity_account_id.as_deref())==route.selected_at_start.as_deref();
+            if changed {store.settings.current_google_accounts.insert(model.clone(),route.account_id.clone());}
             if changed {
                 let _ = store.save();
             }
@@ -1410,6 +1440,7 @@ fn schedule_antigravity_success_refresh(
     client: Client,
     route: AntigravityRoute,
 ) {
+    if std::env::args().any(|a|a=="--validation") || state.store.lock().map(|s|!s.settings.background_refresh).unwrap_or(true) {return;}
     tokio::spawn(async move {
         let latest_quotas = crate::antigravity::quota::fetch_model_quotas(
             &client,
@@ -1573,7 +1604,7 @@ fn pop_sse_data(buffer: &mut Vec<u8>) -> Option<Vec<u8>> {
     }
 }
 
-fn antigravity_codex_catalog_entry(
+pub(crate) fn antigravity_codex_catalog_entry(
     model: &crate::antigravity::AntigravityModel,
     template: Option<&serde_json::Value>,
 ) -> serde_json::Value {
@@ -1650,6 +1681,7 @@ fn antigravity_codex_catalog_entry(
     );
     object.insert("multi_agent_version".into(), serde_json::json!("v2"));
     object.insert("shell_type".into(), serde_json::json!("shell_command"));
+    object.insert("truncation_policy".into(), serde_json::json!({"mode":"bytes","limit":10000}));
     object.insert("tool_mode".into(), serde_json::Value::Null);
     object.insert("visibility".into(), serde_json::json!("list"));
     object.insert("supported_in_api".into(), serde_json::json!(true));
@@ -1675,19 +1707,23 @@ async fn handle_models_with_antigravity(
         if current.is_some_and(|a| !a.is_relay()) {
             return None;
         }
-        let configured = crate::relay_catalog::models(&store);
-        if configured.is_empty() {
+        let configured = crate::relay_catalog::visible_models(&store);
+        if configured.is_empty() && crate::relay_catalog::models(&store).is_empty() {
             return None;
         }
         Some(configured)
     });
     if let Some(configured) = local_relay_catalog {
-        let mut models: Vec<serde_json::Value> = configured
+        let mut models:Vec<serde_json::Value>=state.store.lock().map(|store|{
+            if !store.accounts.values().any(|a|a.is_openai_account()){return Vec::new();}
+            crate::model_routes::native_catalog().into_iter().filter(|m|m["slug"].as_str().or(m["id"].as_str()).is_some_and(|id|store.settings.model_route_policies.get(id).is_none_or(|p|p.enabled&&p.visible))).collect()
+        }).unwrap_or_default();
+        models.extend(configured
             .iter()
             .map(|model| crate::relay_catalog::catalog_entry(model, None))
-            .collect();
+            .collect::<Vec<_>>());
         if let Ok(store) = state.store.lock() {
-            for model in crate::relay_catalog::candidates(&store) {
+            for model in crate::relay_catalog::visible_candidates(&store) {
                 let mut entry = crate::relay_catalog::catalog_entry(&model, None);
                 entry["visibility"] = serde_json::json!("hide");
                 models.push(entry);
@@ -1702,6 +1738,7 @@ async fn handle_models_with_antigravity(
                 .map(|model| antigravity_codex_catalog_entry(model, None)),
             );
         }
+        if let Ok(store)=state.store.lock(){crate::model_routes::unify_catalog(&store,&mut models,false);}
         return Response::builder()
             .status(StatusCode::OK)
             .header("content-type", "application/json")
@@ -1858,12 +1895,12 @@ async fn handle_models_with_antigravity(
     let relay_models = state
         .store
         .lock()
-        .map(|s| crate::relay_catalog::models(&s))
+        .map(|s| crate::relay_catalog::visible_models(&s))
         .unwrap_or_default();
     let relay_aliases = state
         .store
         .lock()
-        .map(|s| crate::relay_catalog::candidates(&s))
+        .map(|s| crate::relay_catalog::visible_candidates(&s))
         .unwrap_or_default();
     if let Some(models) = catalog
         .get_mut("models")
@@ -1899,6 +1936,12 @@ async fn handle_models_with_antigravity(
             );
         }
     }
+    if let Ok(store)=state.store.lock() {
+        for key in ["models","data"] {if let Some(models)=catalog.get_mut(key).and_then(|v|v.as_array_mut()) {
+            models.retain(|m|m["slug"].as_str().or(m["id"].as_str()).is_none_or(|id|store.settings.model_route_policies.get(crate::model_routes::logical_model(id)).is_none_or(|p|p.enabled&&p.visible)));
+            crate::model_routes::unify_catalog(&store,models,key=="data");
+        }}
+    }
     Response::builder()
         .status(StatusCode::OK)
         .header("content-type", "application/json")
@@ -1919,6 +1962,97 @@ fn has_named_relay_models(state: &ProxyState) -> bool {
         .unwrap_or(false)
 }
 
+/// Per-model native selection never mutates the global OpenAI identity or auth files.
+async fn handle_selected_native(state:Arc<ProxyState>,method:Method,path:&str,headers:hyper::HeaderMap,body:Bytes,id:&str)->Response<ProxyBody> {
+    if method!=Method::POST || !(path.split('?').next().unwrap_or("").ends_with("/responses")||is_responses_compact_path(path)) {
+        return error_response(StatusCode::BAD_REQUEST,"Selected OpenAI source requires Responses or compact");
+    }
+    let account=state.store.lock().ok().and_then(|s|s.accounts.get(id).cloned());
+    let Some(account)=account.filter(|a|a.is_openai_account()) else{return error_response(StatusCode::BAD_REQUEST,"Selected OpenAI account is unavailable");};
+    let Some(mut token)=AccountStore::extract_access_token(&account.auth_json) else{return error_response(StatusCode::UNAUTHORIZED,"Selected OpenAI account has no access token");};
+    let refresh=account.auth_json.pointer("/tokens/refresh_token").and_then(|v|v.as_str()).or(account.refresh_token.as_deref());
+    if account.is_chatgpt_oauth() {
+        if let Some(lease)=crate::antigravity::lease::original_openai_owner(id,refresh) {
+            match lease{Ok(lease)=>token=lease.access_token,Err(e)=>return error_response(StatusCode::UNAUTHORIZED,&e)}
+        }
+    }
+    let is_chatgpt=account.is_chatgpt_oauth();
+    let (mut url,mut host)=get_upstream(is_chatgpt,None,path);
+    // Validation can only redirect synthetic credentials to loopback fixtures.
+    if std::env::args().any(|a|a=="--validation") && token.starts_with("synthetic-") {
+        if let Some(base)=account.auth_json.get("validation_endpoint").and_then(|v|v.as_str()) {
+            if let Ok(parsed)=reqwest::Url::parse(base){if parsed.scheme()=="http"&&parsed.host_str()==Some("127.0.0.1")&&parsed.username().is_empty()&&parsed.password().is_none(){url=format!("{}{}",base.trim_end_matches('/'),path);host=parsed.host_str().unwrap().into();}}
+        }
+    }
+    let body=if is_chatgpt{normalize_chatgpt_responses_body(&body,path,&headers)}else{body};
+    let mut upstream_headers=build_upstream_headers(&headers,&host);
+    for name in ["cookie","content-encoding","content-length"]{upstream_headers.remove(name);}
+    let account_id=AccountStore::extract_account_id(&account.auth_json);
+    bind_reqwest_upstream_identity(&mut upstream_headers,&token,if is_chatgpt{account_id.as_deref()}else{None});
+    let response=match state.client.request(reqwest::Method::from_bytes(method.as_str().as_bytes()).unwrap_or(reqwest::Method::POST),url)
+        .headers(upstream_headers).body(body.clone()).send().await {
+        Ok(response)=>response,Err(e)=>return error_response(StatusCode::BAD_GATEWAY,&format!("OpenAI request failed: {e}")),
+    };
+    if !is_responses_compact_path(path) {crate::pet::record(&state.app_handle,&request_model(&body).unwrap_or_default(),&account.name,id,headers.contains_key("x-pod-worker-route"));}
+    build_stream_response(response,Some(state.tracker.clone()),None,None)
+}
+
+async fn handle_selected_source(state:Arc<ProxyState>,method:Method,path:&str,headers:hyper::HeaderMap,body:Bytes,requested:&str,selected:String,pinned:bool)->Response<ProxyBody> {
+    let (model,attempts)={
+        let Ok(store)=state.store.lock() else{return error_response(StatusCode::INTERNAL_SERVER_ERROR,"Account store unavailable");};
+        let model=crate::relay_catalog::resolve(&store,requested).map(|m|crate::relay_catalog::normalized_upstream(&m).to_owned()).unwrap_or_else(||crate::model_routes::logical_model(requested).to_owned());
+        let value:serde_json::Value=serde_json::from_slice(&body).unwrap_or_default();
+        let bound=value.get("previous_response_id").is_some_and(|v|!v.is_null())||value.get("conversation").is_some_and(|v|!v.is_null())||
+            value.get("input").and_then(|v|v.as_array()).is_some_and(|items|items.iter().any(|i|i.get("encrypted_content").is_some()||i["type"]=="compaction"));
+        let mut ids=vec![selected.clone()];
+        if !pinned&&!bound&&!is_responses_compact_path(path) {
+            if let Some(policy)=crate::model_routes::route_policy(&store,&model).filter(|p|p.auto_switch) {
+                for id in &policy.allowed_sources {
+                    if !ids.contains(id)&&crate::model_routes::supports(&store,id,&model)&&store.accounts.get(id).is_some_and(|a|!a.is_banned&&!a.is_logged_out&&!a.is_token_invalid) {ids.push(id.clone());}
+                }
+            }
+        }
+        (model,ids)
+    };
+    let mut value:serde_json::Value=match serde_json::from_slice(&body){Ok(v)=>v,Err(_)=>return error_response(StatusCode::BAD_REQUEST,"Invalid Responses JSON")};
+    if value.pointer("/reasoning/effort").filter(|v|!v.is_null()).is_none() && value.get("reasoning_effort").filter(|v|!v.is_null()).is_none() {
+        if let Some(effort)=crate::antigravity::models::preset_effort(requested.strip_prefix(crate::relay_catalog::CURRENT_PREFIX).unwrap_or(requested)) {
+            if !value["reasoning"].is_object(){value["reasoning"]=serde_json::json!({});}
+            value["reasoning"]["effort"]=serde_json::json!(effort);
+        }
+    }
+    value["model"]=serde_json::json!(model);
+    let body=Bytes::from(serde_json::to_vec(&value).unwrap_or_default());
+    let mut last=None;
+    for id in attempts {
+        let cooldown_key=format!("model:{model}:{id}");
+        if state.quota_cooldown.lock().map(|c|c.get(&cooldown_key).is_some_and(|until|*until>Utc::now().timestamp())).unwrap_or(false) {
+            last=Some(error_response(StatusCode::TOO_MANY_REQUESTS,"Selected source is cooling down for this exact model"));continue;
+        }
+        let account=state.store.lock().ok().and_then(|s|s.accounts.get(&id).cloned());
+        let Some(account)=account else{return error_response(StatusCode::BAD_REQUEST,"Selected model source was removed");};
+        let response=if account.is_antigravity_oauth() {
+            handle_antigravity_response(state.clone(),method.clone(),path,body.clone(),headers.contains_key("x-pod-worker-route"),Some(id.clone())).await
+        } else if account.is_openai_account() {
+            handle_selected_native(state.clone(),method.clone(),path,headers.clone(),body.clone(),&id).await
+        } else {
+            handle_named_relay_response(state.clone(),method.clone(),path,headers.clone(),body.clone(),&model,Some(id.clone())).await
+        };
+        if response.status()==StatusCode::TOO_MANY_REQUESTS {
+            let delay=response.headers().get("retry-after").and_then(|v|v.to_str().ok()).and_then(|s|s.parse::<i64>().ok()).unwrap_or(60).clamp(1,86400);
+            if let Ok(mut cooldown)=state.quota_cooldown.lock(){cooldown.insert(cooldown_key,Utc::now().timestamp()+delay);}
+            last=Some(response);continue;
+        }
+        if response.status().is_success()&&!pinned&&id!=selected {
+            if let Ok(mut store)=state.store.lock(){if store.settings.current_model_sources.get(&model)==Some(&selected){
+                if crate::model_routes::select_source(&mut store,&id,&model).is_ok(){let _=store.save();let _=state.app_handle.emit("accounts-updated",());}
+            }}
+        }
+        return response;
+    }
+    last.unwrap_or_else(||error_response(StatusCode::TOO_MANY_REQUESTS,"No selected source has quota for this exact model"))
+}
+
 async fn handle_named_relay_response(
     state: Arc<ProxyState>,
     method: Method,
@@ -1926,6 +2060,7 @@ async fn handle_named_relay_response(
     req_headers: hyper::HeaderMap,
     body: Bytes,
     slug: &str,
+    forced_account: Option<String>,
 ) -> Response<ProxyBody> {
     let path_only = path.split('?').next().unwrap_or("");
     let is_compact = is_responses_compact_path(path);
@@ -1935,8 +2070,12 @@ async fn handle_named_relay_response(
             "Selected relay model requires the Responses API",
         );
     }
+    let hard_route = resolve_hard_route(&state, &body, &req_headers);
     let target = state.store.lock().ok().and_then(|s| {
-        let model = crate::relay_catalog::resolve(&s, slug)?;
+        let pinned=hard_route.as_ref().map(|(_,id)|id).or(forced_account.as_ref());
+        let model = if let Some(account) = pinned {
+            crate::relay_catalog::resolve_on_account(&s, slug, account)?
+        } else { crate::relay_catalog::resolve(&s, slug)? };
         let account = s.accounts.get(&model.account_id)?;
         Some((
             model,
@@ -1945,7 +2084,7 @@ async fn handle_named_relay_response(
             account.relay_protocol_or_default().to_string(),
         ))
     });
-    let Some((model, base, key, protocol)) = target else {
+    let Some((model, _base, _key, protocol)) = target else {
         // Never silently send a removed/disabled relay model to the ChatGPT account.
         return error_response(
             StatusCode::BAD_REQUEST,
@@ -1953,20 +2092,15 @@ async fn handle_named_relay_response(
         );
     };
     if protocol == "chat_completions" {
+        if !is_compact {crate::pet::record(&state.app_handle,if slug.starts_with(crate::relay_catalog::PREFIX){&model.upstream}else{crate::model_routes::logical_model(slug)},&model.account_name,&model.account_id,
+            req_headers.contains_key("x-pod-worker-route"));}
         if method != Method::POST || (!path.split('?').next().unwrap_or("").ends_with("/responses") && !is_compact) {
             return error_response(
                 StatusCode::BAD_REQUEST,
                 "Selected chat relay model requires the Responses API",
             );
         }
-        let mut value: serde_json::Value = match serde_json::from_slice(&body) {
-            Ok(value) => value,
-            Err(error) => return error_response(StatusCode::BAD_REQUEST, &error.to_string()),
-        };
-        if let Some(object) = value.as_object_mut() {
-            object.insert("model".to_string(), serde_json::json!(model.upstream));
-        }
-        let body = match serde_json::to_vec(&value) {
+        let body = match crate::relay_catalog::request_body(&body,&model) {
             Ok(body) => Bytes::from(body),
             Err(error) => return error_response(StatusCode::BAD_REQUEST, &error.to_string()),
         };
@@ -1991,32 +2125,96 @@ async fn handle_named_relay_response(
         )
         .await;
     }
-    if method != Method::POST || !path.split('?').next().unwrap_or("").ends_with("/responses") {
-        return error_response(
-            StatusCode::BAD_REQUEST,
-            "Selected relay model requires the Responses API",
-        );
+    // Both /responses and /responses/compact were validated above. A second
+    // responses-only guard used to make native compaction unreachable.
+    if protocol != "responses" {
+        return error_response(StatusCode::BAD_REQUEST, "Unsupported relay protocol");
+    }
+    let value: serde_json::Value = match serde_json::from_slice(&body) {
+        Ok(value) => value,
+        Err(error) => return error_response(StatusCode::BAD_REQUEST, &error.to_string()),
+    };
+    // Opaque history and server-side IDs are source-bound. Do not replay them
+    // to another account/provider and silently lose the conversation context.
+    let source_bound = value.get("previous_response_id").is_some_and(|v| !v.is_null())
+        || value.get("conversation").is_some_and(|v| !v.is_null())
+        || value.get("input").and_then(|v| v.as_array()).is_some_and(|items| items.iter().any(|i| {
+            i.get("type").and_then(|v| v.as_str()) == Some("compaction") || i.get("encrypted_content").is_some()
+        }));
+    let automatic = forced_account.is_none() && hard_route.is_none() && slug.starts_with(crate::relay_catalog::CURRENT_PREFIX) && !source_bound;
+    let mut attempts = vec![model.clone()];
+    if automatic {
+        if let Ok(store) = state.store.lock() {
+            attempts.extend(crate::relay_catalog::native_failover_candidates(&store, &model));
+        }
+    }
+    let can_switch = attempts.len() > 1;
+    let now = Utc::now().timestamp();
+    if can_switch {
+        if let Ok(cooldown) = state.quota_cooldown.lock() {
+            attempts.retain(|candidate| cooldown.get(&format!("model:{}:{}", candidate.upstream, candidate.account_id))
+                .is_none_or(|until| *until <= now));
+        }
+    }
+    if attempts.is_empty() {
+        let mut response = error_response(StatusCode::TOO_MANY_REQUESTS, "All permitted sources for this model are cooling down; model was not changed");
+        response.headers_mut().insert("retry-after", HeaderValue::from_static("30"));
+        return response;
     }
     // Fresh headers: do not leak a ChatGPT bearer, account id, cookies or private
     // routing headers to a third-party API. Native Responses body/events pass through.
-    let response = match if is_compact {
-        crate::relay_catalog::forward_native_compact(&state.client, &base, &key, &body, &model)
-            .await
-    } else {
-        crate::relay_catalog::forward_native(&state.client, &base, &key, &body, &model).await
-    } {
-        Ok(response) => response,
-        Err(error) => return error_response(StatusCode::BAD_GATEWAY, &error),
-    };
-    if response.status().is_success() {
-        if let Ok(mut store) = state.store.lock() {
-            if let Some(account) = store.accounts.get_mut(&model.account_id) {
-                account.last_used = Some(Utc::now());
-            }
-            let _ = store.save();
+    let count = attempts.len();
+    for (index, candidate) in attempts.into_iter().enumerate() {
+        if index > 0 || candidate.account_id != model.account_id {
+            let still_allowed = state.store.lock().map(|store| {
+                crate::relay_catalog::native_failover_candidates(&store, &model).iter().any(|m| m.account_id == candidate.account_id)
+            }).unwrap_or(false);
+            if !still_allowed { return error_response(StatusCode::TOO_MANY_REQUESTS, "Automatic switching was disabled while waiting; no new source was called"); }
         }
+        let credentials = state.store.lock().ok().and_then(|store| {
+            let account = store.accounts.get(&candidate.account_id)?;
+            Some((account.relay_base_url.clone()?, AccountStore::extract_access_token(&account.auth_json)?))
+        });
+        let Some((base, key)) = credentials else {
+            return error_response(StatusCode::BAD_REQUEST, "Selected source was removed; refusing to use another identity");
+        };
+        if !is_compact {crate::pet::record(&state.app_handle,if slug.starts_with(crate::relay_catalog::PREFIX){&candidate.upstream}else{crate::model_routes::logical_model(slug)},&candidate.account_name,&candidate.account_id,
+            req_headers.contains_key("x-pod-worker-route"));}
+        let response = match if is_compact {
+            crate::relay_catalog::forward_native_compact(&state.client, &base, &key, &body, &candidate).await
+        } else {
+            crate::relay_catalog::forward_native(&state.client, &base, &key, &body, &candidate).await
+        } {
+            Ok(response) => response,
+            // Unknown transport failures may have already executed work: never replay.
+            Err(error) => return error_response(StatusCode::BAD_GATEWAY, &error),
+        };
+        if response.status() == reqwest::StatusCode::TOO_MANY_REQUESTS && can_switch {
+            let delay = response.headers().get("retry-after").and_then(|v| v.to_str().ok())
+                .and_then(|v| v.parse::<i64>().ok()).unwrap_or(30).clamp(1, 3600);
+            if let Ok(mut cooldown) = state.quota_cooldown.lock() {
+                cooldown.insert(format!("model:{}:{}", candidate.upstream, candidate.account_id), Utc::now().timestamp() + delay);
+            }
+            if index + 1 < count { continue; }
+        }
+        let mut changed = false;
+        if response.status().is_success() {
+            if let Ok(mut store) = state.store.lock() {
+                if let Some(account) = store.accounts.get_mut(&candidate.account_id) { account.last_used = Some(Utc::now()); }
+                if candidate.account_id != model.account_id && store.settings.current_relay_accounts.get(&model.upstream).is_none_or(|id| id == &model.account_id) {
+                    store.settings.current_relay_accounts.insert(model.upstream.clone(), candidate.account_id.clone());
+                    changed = true;
+                }
+                if let Err(error) = store.save() { eprintln!("[ModelRoute] Cannot persist selected source: {error}"); }
+            }
+        }
+        if changed {
+            state.stats.auto_switches.fetch_add(1, Ordering::Relaxed);
+            let _ = state.app_handle.emit("accounts-updated", ());
+        }
+        return build_stream_response(response, None, None, None);
     }
-    build_stream_response(response, None, None, None)
+    error_response(StatusCode::BAD_GATEWAY, "No permitted source; model was not changed")
 }
 
 fn is_responses_compact_path(path: &str) -> bool {
@@ -3386,40 +3584,37 @@ async fn handle_request(
                 }
             }
         }
+        // A session/worker binding is stronger than a global model hint.
+        if routing_hint_model(req.headers()).is_some_and(|model| state.store.lock()
+            .map(|s|crate::relay_catalog::request_disabled(&s,&model)).unwrap_or(true)) {
+            return Ok(error_response(StatusCode::FORBIDDEN, "Model disabled in Switcher Pet"));
+        }
+        if let Some((_session, account_id)) = resolve_hard_route(&state, &[], req.headers()) {
+            let google=state.store.lock().map(|s|s.accounts.get(&account_id).is_some_and(|a|a.is_antigravity_oauth())).unwrap_or(false);
+            let native=state.store.lock().map(|s|s.accounts.get(&account_id).is_some_and(|a|a.is_openai_account())).unwrap_or(false);
+            if google||native {return handle_model_routed_websocket(state,req).await;}
+            match relay_route_for_account(&state, &account_id) {
+                Some(relay) if relay.protocol == "responses" => return handle_model_routed_websocket(state, req).await,
+                Some(relay) if relay.protocol == "chat_completions" => return handle_chat_completions_relay_websocket(state, relay, req).await,
+                _ => return Ok(error_response(StatusCode::NOT_IMPLEMENTED, "This WebSocket hard-bound account is not supported; refusing to fall back to the current account")),
+            }
+        }
         // Desktop provides the selected model in a local routing hint. Route
         // provider models before opening any ChatGPT socket; the old late probe
         // added an avoidable handshake and could strand the first turn.
+        if routing_hint_model(req.headers()).is_none() && state.store.lock().map(|s|!s.settings.current_model_sources.is_empty() || !crate::relay_catalog::models(&s).is_empty()).unwrap_or(false) {
+            return handle_model_routed_websocket(state,req).await;
+        }
         if routing_hint_model(req.headers())
             .as_deref()
             .is_some_and(|model| {
                 antigravity_model_available(&state, model)
                     || crate::relay_catalog::is_relay_model_slug(model)
+                    || state.store.lock().map(|s|crate::model_routes::selected(&s,model).is_some()).unwrap_or(false)
             })
         {
             return handle_model_routed_websocket(state, req).await;
         }
-        // Hard route 优先：WS upgrade body 是空的，只查 headers（codex 用
-        // session_id / x-session-id / Session_id header 透 session_key 出来）。
-        if let Some((_sk, account_id)) = resolve_hard_route(&state, &[], req.headers()) {
-            if let Some(hard_relay) = relay_route_for_account(&state, &account_id) {
-                if hard_relay.protocol == "chat_completions" {
-                    println!(
-                        "[Proxy] Hard route WS → chat_completions Relay 适配器（{}）",
-                        hard_relay.account_id
-                    );
-                    return handle_chat_completions_relay_websocket(state, hard_relay, req).await;
-                }
-                // 绑定的 Relay 是 responses 协议 —— 当成普通 WS 直接进 handle_websocket，
-                // 但需要把 store.current 临时改成绑定账号。WS 路径目前不支持 per-request
-                // 账号覆盖，暂不实现该分支（用户应该选 chat_completions 协议的 Relay 才 ok）。
-                println!(
-                    "[Proxy] Hard route 绑定的 Relay 是 responses 协议，WS 路径暂不支持 per-request 覆盖，落回 current"
-                );
-            }
-            // 绑定的不是 Relay（订阅号），WS 路径要做 per-request 账号覆盖很复杂。
-            // 当前限制：hard route 在 WS 路径只对 chat_completions Relay 生效。
-        }
-
         if let Some(relay) = current_relay_route(&state) {
             if relay.protocol == "chat_completions" {
                 println!(
@@ -3466,6 +3661,26 @@ async fn handle_request(
         Err(error) => return Ok(error_response(StatusCode::BAD_REQUEST, &error)),
     };
     if let Some(model) = request_model(&body_for_routing) {
+        if state.store.lock().map(|s| crate::relay_catalog::request_disabled(&s, &model)).unwrap_or(true) {
+            return Ok(error_response(StatusCode::FORBIDDEN, "Model disabled in Switcher Pet; no alternative model was selected"));
+        }
+        let bound=resolve_hard_route(&state,&body_for_routing,&req_headers).map(|(_,id)|id);
+        let unified=state.store.lock().ok().and_then(|s|crate::model_routes::selected(&s,&model));
+        let bound_native=bound.as_ref().is_some_and(|id|state.store.lock().map(|s|s.accounts.get(id).is_some_and(|a|a.is_openai_account())).unwrap_or(false));
+        if let Some(id)=bound.clone().filter(|_|bound_native).or_else(||if bound.is_none(){unified}else{None}) {
+            return Ok(handle_selected_source(state,method,&path_and_query,req_headers,body_for_routing,&model,id,bound.is_some()).await);
+        }
+        let bound_google=bound.as_ref().is_some_and(|id|state.store.lock().map(|s|s.accounts.get(id).is_some_and(|a|a.is_antigravity_oauth())).unwrap_or(false));
+        if bound_google {
+            return Ok(handle_antigravity_response(state,method,&path_and_query,body_for_routing,req_headers.contains_key("x-pod-worker-route"),bound).await);
+        }
+        if !crate::relay_catalog::is_relay_model_slug(&model) {
+            if let Some((_, id)) = resolve_hard_route(&state, &body_for_routing, &req_headers) {
+                if relay_route_for_account(&state, &id).is_some_and(|route| route.protocol == "responses") {
+                    return Ok(handle_named_relay_response(state, method, &path_and_query, req_headers, body_for_routing, &model, None).await);
+                }
+            }
+        }
         if crate::relay_catalog::is_relay_model_slug(&model) {
             return Ok(handle_named_relay_response(
                 state,
@@ -3474,17 +3689,27 @@ async fn handle_request(
                 req_headers,
                 body_for_routing,
                 &model,
+                None,
             )
             .await);
         }
-        if antigravity_model_available(&state, &model) {
+        if bound.is_none() && antigravity_model_available(&state, &model) {
             return Ok(handle_antigravity_response(
                 state,
                 method,
                 &path_and_query,
                 body_for_routing,
+                req_headers.contains_key("x-pod-worker-route"),
+                None,
             )
             .await);
+        }
+        if let Ok(store)=state.store.lock() {
+            if let Some(account)=store.current.as_ref().and_then(|id|store.accounts.get(id)).filter(|a|a.is_openai_account()) {
+                if !is_responses_compact_path(&path_and_query) {
+                    crate::pet::record(&state.app_handle,&model,&account.name,&account.id,req_headers.contains_key("x-pod-worker-route"));
+                }
+            }
         }
     }
 
@@ -6424,7 +6649,7 @@ fn dump_moderation_sample(buf: Arc<Mutex<Vec<u8>>>, hit_kw: &'static str) {
             Ok(b) => b.clone(),
             Err(_) => return,
         };
-        let Some(home) = dirs::home_dir() else { return };
+        let Some(home) = crate::app_paths::profile_home() else { return };
         let dir = home.join(".codex-switcher").join("moderation-samples");
         if let Err(e) = std::fs::create_dir_all(&dir) {
             eprintln!("[Proxy] moderation 样本目录创建失败: {}", e);
@@ -7197,6 +7422,7 @@ async fn handle_websocket(
 
     // 7. 后台任务：upgrade 完成后双向桥接
     let disconnect = state.ws_disconnect.clone();
+    let local_route_headers = model_bridge_headers(req.headers());
     tokio::spawn(async move {
         match on_upgrade.await {
             Ok(upgraded) => {
@@ -7225,7 +7451,7 @@ async fn handle_websocket(
                     println!("[Proxy] 已注入切号通知到 WebSocket");
                 }
 
-                bridge_websockets(client_ws, upstream_ws, disconnect, state, socket_account_id).await;
+                bridge_websockets(client_ws, upstream_ws, disconnect, state, socket_account_id, local_route_headers).await;
                 println!("[Proxy] WebSocket 连接已关闭");
             }
             Err(e) => eprintln!("[Proxy] WebSocket upgrade 失败: {}", e),
@@ -7240,6 +7466,7 @@ async fn handle_model_routed_websocket(
     mut req: Request<Incoming>,
 ) -> Result<Response<ProxyBody>, Infallible> {
     let model_hint = routing_hint_model(req.headers());
+    let local_route_headers = model_bridge_headers(req.headers());
     let key = req
         .headers()
         .get("sec-websocket-key")
@@ -7265,7 +7492,7 @@ async fn handle_model_routed_websocket(
             None,
         )
         .await;
-        bridge_antigravity_websocket(client, std::collections::VecDeque::new(), state, model_hint)
+        bridge_antigravity_websocket(client, std::collections::VecDeque::new(), state, model_hint, local_route_headers)
             .await;
     });
     Ok(response)
@@ -7559,6 +7786,7 @@ async fn bridge_websockets<S1, S2>(
     disconnect: Arc<tokio::sync::Notify>,
     state: Arc<ProxyState>,
     socket_account_id: Option<String>,
+    local_route_headers: hyper::HeaderMap,
 ) where
     S1: futures_util::Stream<Item = Result<tungstenite::Message, tungstenite::Error>>
         + futures_util::Sink<tungstenite::Message, Error = tungstenite::Error>
@@ -7595,13 +7823,23 @@ async fn bridge_websockets<S1, S2>(
         .map(|model| {
             antigravity_model_available(&state, model)
                 || crate::relay_catalog::is_relay_model_slug(model)
+                || state.store.lock().map(|s|crate::model_routes::selected(&s,model).is_some()).unwrap_or(false)
         })
         .unwrap_or(false)
     {
         drop(upstream);
-        bridge_antigravity_websocket(client, pending, state, detected_model).await;
+        bridge_antigravity_websocket(client, pending, state, detected_model, local_route_headers).await;
         return;
     }
+
+    let record_ws_model = |model:&str| {
+        if let Ok(store)=state.store.lock() {
+            if let Some(account)=socket_account_id.as_ref().and_then(|id|store.accounts.get(id)) {
+                crate::pet::record(&state.app_handle,model,&account.name,&account.id,local_route_headers.contains_key("x-pod-worker-route"));
+            }
+        }
+    };
+    if let Some(model)=detected_model.as_deref(){record_ws_model(model);}
 
     let (mut client_write, mut client_read) = client.split();
     let (mut upstream_write, mut upstream_read) = upstream.split();
@@ -7676,6 +7914,8 @@ async fn bridge_websockets<S1, S2>(
                     }
                     // 嗅探 client→upstream 的 JSON 文本，提取 session_key（首次命中即固定）
                     if let tungstenite::Message::Text(ref t) = msg {
+                        if let Some(model)=ws_message_model(&msg){record_ws_model(&model);}
+
                         // 标记 Spark 模型会话：它的 429 不该触发切号（见 request_is_spark_model）
                         if !ws_is_spark_w.load(std::sync::atomic::Ordering::Relaxed)
                             && request_is_spark_model(t.as_bytes())
@@ -8052,11 +8292,20 @@ fn model_ws_body(
     Ok(Some(body))
 }
 
+fn model_bridge_headers(headers: &hyper::HeaderMap) -> hyper::HeaderMap {
+    let mut kept = hyper::HeaderMap::new();
+    for name in ["session_id", "session-id", "x-session-id", "thread_id", "x-pod-worker-route"] {
+        if let Some(value) = headers.get(name) { kept.insert(name, value.clone()); }
+    }
+    kept
+}
+
 async fn bridge_antigravity_websocket<S>(
     mut client: S,
     mut pending: std::collections::VecDeque<Result<tungstenite::Message, tungstenite::Error>>,
     state: Arc<ProxyState>,
     mut model_hint: Option<String>,
+    local_route_headers: hyper::HeaderMap,
 ) where
     S: futures_util::Stream<Item = Result<tungstenite::Message, tungstenite::Error>>
         + futures_util::Sink<tungstenite::Message, Error = tungstenite::Error>
@@ -8090,6 +8339,7 @@ async fn bridge_antigravity_websocket<S>(
                     text.as_str(),
                     &mut client,
                     model_hint.as_deref(),
+                    &local_route_headers,
                 )
                 .await
                 {
@@ -8126,6 +8376,7 @@ async fn execute_antigravity_ws_frame<S>(
     text: &str,
     client: &mut S,
     model_hint: Option<&str>,
+    local_route_headers: &hyper::HeaderMap,
 ) -> Result<(), String>
 where
     S: futures_util::Sink<tungstenite::Message, Error = tungstenite::Error> + Unpin,
@@ -8167,6 +8418,7 @@ where
     }
     let response = http
         .post(format!("http://127.0.0.1:{proxy_port}/v1/responses"))
+        .headers(local_route_headers.clone())
         .header("content-type", "application/json")
         .json(&body)
         .send()
@@ -8174,7 +8426,12 @@ where
         .map_err(|e| e.to_string())?;
     let status = response.status();
     if !status.is_success() {
-        return Err(format!("Model upstream HTTP {status}"));
+        // Preserve the useful translator/upstream diagnosis instead of masking
+        // every invalid tool request as an unexplained HTTP status.
+        let raw=response.text().await.unwrap_or_default();
+        let value:serde_json::Value=serde_json::from_str(&raw).unwrap_or_default();
+        let message=value.pointer("/error/message").and_then(|v|v.as_str()).unwrap_or("Request rejected");
+        return Err(format!("Model upstream HTTP {status}: {}",message.chars().take(800).collect::<String>()));
     }
     let mut stream = response.bytes_stream();
     let mut buffer = Vec::new();
@@ -8551,6 +8808,9 @@ where
         relay.model_fallback.as_deref(),
     );
     let model = extract_model_from_body(&body_for_translate);
+    if state.store.lock().map(|s|crate::relay_catalog::request_disabled(&s,&model)).unwrap_or(true) {
+        return Err("Model disabled in Switcher Pet; no alternative model was selected".into());
+    }
     let (mut chat_body, mut translator_state) =
         crate::relay_translate::translate_request(&body_for_translate, &model)
             .map_err(|e| format!("translator 请求处理失败: {}", e))?;
@@ -8927,6 +9187,9 @@ async fn handle_chat_completions_relay(
         relay.model_fallback.as_deref(),
     );
     let model = extract_model_from_body(&body_for_translate);
+    if state.store.lock().map(|s|crate::relay_catalog::request_disabled(&s,&model)).unwrap_or(true) {
+        return error_response(StatusCode::FORBIDDEN, "Model disabled in Switcher Pet; no alternative model was selected");
+    }
     let (mut chat_body, mut translator_state) = match crate::relay_translate::translate_request(
         &body_for_translate,
         &model,
@@ -9163,16 +9426,16 @@ async fn handle_chat_completions_relay(
 fn relay_compaction_unavailable_response() -> Response<ProxyBody> {
     let body = serde_json::json!({
         "error": {
-            "type": "rate_limit_error",
+            "type": "unsupported_operation",
             "code": "compaction_not_supported",
-            "message": "This chat-completions Relay cannot provide Responses compaction; Codex may continue without this compaction attempt."
+            "message": "This chat-completions source does not implement Responses compaction. It is not a quota failure; choose a source with compaction support."
         }
     });
     Response::builder()
-        .status(StatusCode::TOO_MANY_REQUESTS)
+        .status(StatusCode::NOT_IMPLEMENTED)
         .header("content-type", "application/json")
         .body(full_body(Bytes::from(body.to_string())))
-        .unwrap_or_else(|_| error_response(StatusCode::TOO_MANY_REQUESTS, "compaction unavailable"))
+        .unwrap_or_else(|_| error_response(StatusCode::NOT_IMPLEMENTED, "compaction unavailable"))
 }
 
 fn error_response(status: StatusCode, message: &str) -> Response<ProxyBody> {
@@ -9295,9 +9558,9 @@ mod tests {
     }
 
     #[test]
-    fn chat_relay_compaction_is_retryable_not_a_fake_completion() {
+    fn chat_relay_compaction_is_unsupported_not_a_fake_quota_failure() {
         let response = relay_compaction_unavailable_response();
-        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
     }
 
     #[test]

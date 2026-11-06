@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { DesktopPet } from './components/DesktopPet';
 import { TrayPopup } from "./components/TrayPopup";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { invoke } from "@tauri-apps/api/core";
@@ -17,7 +18,7 @@ async function startApp() {
 
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <React.StrictMode>
-      {label === "tray-popup" ? <TrayPopup /> : <App />}
+      {label === 'pet' ? <DesktopPet /> : label === "tray-popup" ? <TrayPopup /> : <App />}
     </React.StrictMode>,
   );
 }

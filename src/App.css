@@ -1,3 +1,11 @@
+.isolated-preview-notice {
+  padding: 0;
+  margin-bottom: 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 :root {
   --bg-primary: #f6f8fa;
   --bg-secondary: #ffffff;
@@ -154,12 +162,24 @@ body {
 
 .app-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 16px 24px;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
+}
+
+/* Keep navigation readable at native WebView zoom levels. */
+.app-header .header-nav {
+  order: 3;
+  flex: 1 0 100%;
+  overflow-x: auto;
+}
+.app-header .nav-item {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .header-left {

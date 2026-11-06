@@ -149,7 +149,7 @@ impl SwitchLogger {
     }
 
     fn log_path() -> PathBuf {
-        dirs::home_dir()
+        crate::app_paths::profile_home()
             .expect("home dir")
             .join(".codex-switcher")
             .join("switch-history.jsonl")

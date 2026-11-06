@@ -73,7 +73,7 @@ export function Settings({ accounts = [], onSetSessionAnchor }: SettingsProps = 
         proxy_allow_lan: false,
         switch_mode: 'auto',
         remote_mode: 'off',
-        remote_server_port: 18081,
+        remote_server_port: 28181,
         remote_server_bind: '0.0.0.0',
         remote_server_url: '',
         remote_server_url_fallback: '',
@@ -544,7 +544,7 @@ export function Settings({ accounts = [], onSetSessionAnchor }: SettingsProps = 
                         <div className="setting-item sub-item">
                             <div className="setting-info">
                                 <span className="setting-label">监听端口</span>
-                                <span className="setting-desc">Server 侧 HTTP API 端口（默认 18081）</span>
+                                <span className="setting-desc">Server 侧 HTTP API 端口（默认 28181）</span>
                             </div>
                             <input
                                 type="number"
@@ -552,7 +552,7 @@ export function Settings({ accounts = [], onSetSessionAnchor }: SettingsProps = 
                                 min={1024}
                                 max={65535}
                                 value={settings.remote_server_port}
-                                onChange={e => updateField('remote_server_port', parseInt(e.target.value) || 18081)}
+                                onChange={e => updateField('remote_server_port', parseInt(e.target.value) || 28181)}
                             />
                         </div>
 
@@ -615,7 +615,7 @@ export function Settings({ accounts = [], onSetSessionAnchor }: SettingsProps = 
                         <div className="setting-item sub-item">
                             <div className="setting-info">
                                 <span className="setting-label">Server API 地址（主）</span>
-                                <span className="setting-desc">优先尝试，建议填局域网 IP，如 http://192.168.2.14:18081</span>
+                                <span className="setting-desc">优先尝试，建议填局域网 IP，如 http://192.168.2.14:28181</span>
                             </div>
                             <input
                                 type="text"
@@ -623,14 +623,14 @@ export function Settings({ accounts = [], onSetSessionAnchor }: SettingsProps = 
                                 style={{ minWidth: 260 }}
                                 value={settings.remote_server_url}
                                 onChange={e => updateField('remote_server_url', e.target.value)}
-                                placeholder="http://192.168.2.14:18081"
+                                placeholder="http://192.168.2.14:28181"
                             />
                         </div>
 
                         <div className="setting-item sub-item">
                             <div className="setting-info">
                                 <span className="setting-label">Server API 地址（回退）</span>
-                                <span className="setting-desc">主不通时自动切换，建议填 ZeroTier IP，如 http://172.26.96.198:18081</span>
+                                <span className="setting-desc">主不通时自动切换，建议填 ZeroTier IP，如 http://172.26.96.198:28181</span>
                             </div>
                             <input
                                 type="text"
@@ -638,7 +638,7 @@ export function Settings({ accounts = [], onSetSessionAnchor }: SettingsProps = 
                                 style={{ minWidth: 260 }}
                                 value={settings.remote_server_url_fallback}
                                 onChange={e => updateField('remote_server_url_fallback', e.target.value)}
-                                placeholder="http://172.26.96.198:18081"
+                                placeholder="http://172.26.96.198:28181"
                             />
                         </div>
 

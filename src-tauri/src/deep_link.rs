@@ -76,6 +76,7 @@ pub fn parse(url: &str) -> Result<PendingRelayImport, DeepLinkError> {
 
     let scheme = parsed.scheme();
     let source = match scheme {
+        "switcherpet" => "switcherpet".to_string(),
         "codexswitch" => "codexswitch".to_string(),
         "ccswitch" => "ccswitch".to_string(),
         _ => return Err(DeepLinkError::UnsupportedScheme),
