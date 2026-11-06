@@ -15,12 +15,15 @@ pub struct Preferences {
     pub volume: f64,
     pub reduce_motion: bool,
     pub detailed: bool,
+    pub menu_scope: String,
+    pub menu_weekly: bool,
 }
 impl Default for Preferences {
-    fn default()->Self {Self {silent_start:true,pinch:true,follow_activity:true,fixed_family:"gpt".into(),muted:false,total:true,volume:0.5,reduce_motion:false,detailed:false}}
+    fn default()->Self {Self {silent_start:true,pinch:true,follow_activity:true,fixed_family:"gpt".into(),muted:false,total:true,volume:0.5,reduce_motion:false,detailed:false,menu_scope:"pool".into(),menu_weekly:false}}
 }
 impl Preferences {
     pub fn validate(&self)->Result<(),String> {
+        if !["pool","model","account"].contains(&self.menu_scope.as_str()) {return Err("Unknown menu-bar scope".into());}
         if !["gpt","claude","deepseek","gemini","grok","kimi","qwen","glm"].contains(&self.fixed_family.as_str()) {return Err("Unknown pet skin".into());}
         if !self.volume.is_finite() || !(0.0..=1.0).contains(&self.volume) {return Err("Volume must be 0–1".into());}
         Ok(())

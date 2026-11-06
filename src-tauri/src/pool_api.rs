@@ -19,6 +19,10 @@ pub fn set_source_policy(state: State<AppState>, app: tauri::AppHandle, id: Stri
 #[tauri::command]
 pub fn get_pool_dashboard(state: State<AppState>) -> Result<serde_json::Value,String> {
     let store=state.store.lock().map_err(|e|e.to_string())?;
+    Ok(dashboard(&store))
+}
+
+pub fn dashboard(store: &AccountStore) -> serde_json::Value {
     let candidates=relay_catalog::candidates(&store);
     let mut members=Vec::new();
     for a in store.accounts.values() {
@@ -93,5 +97,5 @@ pub fn get_pool_dashboard(state: State<AppState>) -> Result<serde_json::Value,St
             }
         }
     }
-    Ok(serde_json::json!({"summary":pool_math::aggregate(&members,now),"model":model,"model_summary":pool_math::aggregate(&scoped,now),"model_quota":model_quota,"model_short":model_short,"model_weekly":model_weekly,"accounts":rows,"probes":crate::source_probe::snapshot(),"now":now}))
+    serde_json::json!({"summary":pool_math::aggregate(&members,now),"model":model,"model_summary":pool_math::aggregate(&scoped,now),"model_quota":model_quota,"model_short":model_short,"model_weekly":model_weekly,"accounts":rows,"probes":crate::source_probe::snapshot(),"now":now})
 }

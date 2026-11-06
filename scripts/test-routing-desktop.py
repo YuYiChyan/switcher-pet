@@ -23,6 +23,8 @@ calls = []
 reads = []
 fail_budget_usage = False
 usage_remaining = 12.5
+usage_delay = 0
+usage_failure = False
 lock = threading.Lock()
 rate_limited = {'test-off', 'test-on', 'test-history', 'test-all', 'test-excluded'}
 
@@ -37,7 +39,9 @@ class Provider(BaseHTTPRequestHandler):
         elif self.path.endswith('/billing/subscription'): self.reply(200,{'soft_limit_usd':50})
         elif self.path.endswith('/billing/usage'):
             self.reply(503 if fail_budget_usage else 200, {'error':'synthetic outage'} if fail_budget_usage else {'total_usage':200})
-        elif self.path.endswith('/usage'): self.reply(200,{'remaining':usage_remaining,'unit':'USD','is_active':True})
+        elif self.path.endswith('/usage'):
+            time.sleep(usage_delay)
+            self.reply(503 if usage_failure else 200, {'error':'synthetic quota outage'} if usage_failure else {'remaining':usage_remaining,'unit':'USD','is_active':True})
         else: self.reply(200, {'data': [{'id': m} for m in models]})
     def reply(self, status, data, content_type='application/json'):
         raw = data.encode() if isinstance(data, str) else json.dumps(data).encode()
@@ -352,6 +356,30 @@ with sync_playwright() as p:
         assert api_cache['remaining']==10 and api_cache['balance_capacity']==12.5 and api_cache['balance_capacity_estimated']
         usage_remaining=12.5
         invoke('probe_source_now',{'id':a})
+        # A real squeeze must fetch fresh balance, not merely repaint cached quota.
+        saved_adapters={id:policy_for(id)['balance_adapter'] for id in [b,d]}
+        for id in saved_adapters:save_source(id,balance_adapter='off')
+        before=len(reads);usage_remaining=8;usage_delay=.8
+        pet.get_by_role('button',name='查看用量',exact=True).click()
+        expect(pet.locator('.pet-widget')).to_have_attribute('aria-busy','true')
+        reports=page.evaluate("async()=>Promise.all(Array.from({length:3},()=>window.__TAURI_INTERNALS__.invoke('refresh_pet_quota')))")
+        assert all(r['busy'] for r in reports),reports
+        expect(pet.locator('.pet-widget')).to_have_attribute('aria-busy','false',timeout=10000)
+        assert next(r for r in invoke('get_accounts') if r['id']==a)['relay_usage_cache']['remaining']==8
+        assert len(reads[before:])==1 and reads[-1]['path'].endswith('/usage'),reads[before:]
+        usage_delay=0;usage_remaining=12.5;before=len(reads)
+        pet.get_by_role('button',name='查看用量',exact=True).click()
+        expect(pet.locator('.pet-widget')).to_have_attribute('aria-busy','false',timeout=10000)
+        assert next(r for r in invoke('get_accounts') if r['id']==a)['relay_usage_cache']['remaining']==12.5
+        assert len(reads[before:])==1
+        usage_failure=True
+        pet.get_by_role('button',name='查看用量',exact=True).click()
+        expect(pet.locator('.pet-widget')).to_have_attribute('aria-busy','false',timeout=10000)
+        row=next(r for r in invoke('get_accounts') if r['id']==a)
+        assert row['relay_usage_cache']['remaining']==12.5 and not row['is_logged_out'] and not row['is_token_invalid']
+        usage_failure=False
+        for id,adapter in saved_adapters.items():save_source(id,balance_adapter=adapter)
+        checks.append('each squeeze performs balance-only networking; overlapping refreshes coalesce; failures preserve balance and account validity')
         assert request('relay-current:claude-synthetic',headers={'x-pod-worker-route':'synthetic-worker'})[0]==200
         assert invoke('get_pet_activity')['model']=='gemini-synthetic'
         pet.get_by_role('button',name='查看用量',exact=True).click()
@@ -622,10 +650,16 @@ with sync_playwright() as p:
         checks.append('mapped API names join native selector; one visible logical catalog; HTTP/WS/compact rewrite only at source; alias-aware same-model failover')
         # Explicit Chat Completions maps must work without a /models probe.
         mapped_chat=invoke('add_relay_account',{'name':'Synthetic mapped chat','baseUrl':f'http://127.0.0.1:{server.server_port}/d/v1',
-            'apiKey':'synthetic-mapped-chat','modelMap':{'gpt-native-test':'provider/gpt-native-test'},'relayProtocol':'chat_completions'})['id']
+            'apiKey':'synthetic-mapped-chat','modelMap':{'gpt-native-test':'provider/gpt-native-test','gpt-native-on':'provider/gpt-native-on'},'relayProtocol':'chat_completions'})['id']
         disable_probe(mapped_chat)
         group=next(g for g in invoke('get_model_routes') if g['model']=='gpt-native-test')
-        assert any(s['id']==mapped_chat and not s['automatic_supported'] for s in group['sources'])
+        assert any(s['id']==mapped_chat and s['automatic_supported'] for s in group['sources']), 'Chat Completions exact model wrongly excluded from automatic sources'
+        invoke('set_model_route_policy',{'model':'gpt-native-on','policy':{'enabled':True,'visible':True,'auto_switch':True,'allowed_sources':[mapped_chat]}})
+        invoke('set_model_source',{'id':oa,'model':'gpt-native-on'})
+        status,raw=request('gpt-native-on')
+        assert status==200,(status,raw)
+        assert seen('provider/gpt-native-on')[-1]['path']=='/d/v1/chat/completions'
+        assert invoke('get_settings')['current_model_sources']['gpt-native-on']==mapped_chat
         invoke('set_model_source',{'id':mapped_chat,'model':'gpt-native-test'})
         status,raw=request('gpt-native-test')
         assert status==200,(status,raw)

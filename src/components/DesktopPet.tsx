@@ -37,6 +37,18 @@ export function DesktopPet() {
   const [showError,setShowError]=useState(false);
   const requestSequence=useRef(0);
   const refresh=async()=>{const sequence=++requestSequence.current;try{const next=await invoke<Pool>('get_pool_dashboard');if(sequence===requestSequence.current)setPool(next);}catch(e){setNotice(String(e));}};
+  const quotaPending=useRef(false);
+  const [quotaRefreshing,setQuotaRefreshing]=useState(false);
+  const refreshQuota=async()=>{
+    if(quotaPending.current)return;
+    quotaPending.current=true;setQuotaRefreshing(true);
+    try{const result=await invoke<{busy:boolean;refreshed:number;failed:number}>('refresh_pet_quota');
+      if(result.failed)setNotice(`额度刷新：${result.refreshed} 个成功，${result.failed} 个暂未更新，保留上次记录`);
+      else if(!result.busy)setNotice('');
+      await refresh();
+    }catch(e){setNotice(String(e));}
+    finally{quotaPending.current=false;setQuotaRefreshing(false);}
+  };
   const setMuted=()=>void save({muted:!prefRef.current.muted});
   const toggleMode=()=>void save({detailed:!prefRef.current.detailed});
   const cancelHold=()=>{clearTimeout(hold.current.timer);};
@@ -67,7 +79,7 @@ export function DesktopPet() {
     <button className={`pet-character ${squash.held?'pet-held':''}`} aria-label="查看用量"
       style={{transform:`scale(${squash.x},${squash.y})`,transition:squash.held||p.reduce_motion?'none':undefined}}
       onPointerDown={e=>{if(e.button!==0)return;startHold(e.screenX,e.screenY);pointer.current={x:e.screenX,y:e.screenY,dragged:false};
-        if(p.pinch){e.currentTarget.setPointerCapture(e.pointerId);setSquash({x:p.reduce_motion?1:1.12,y:p.reduce_motion?1:.86,held:true});audio.play('press');}}}
+        if(p.pinch){void refreshQuota();e.currentTarget.setPointerCapture(e.pointerId);setSquash({x:p.reduce_motion?1:1.12,y:p.reduce_motion?1:.86,held:true});audio.play('press');}}}
       onPointerMove={e=>{moveHold(e.screenX,e.screenY);const start=pointer.current;if(!start)return;const distance=Math.hypot(e.screenX-start.x,e.screenY-start.y);
         if(p.pinch){if(!p.reduce_motion){const squeeze=Math.max(-.2,Math.min(.3,(e.screenY-start.y)/180));setSquash({x:1.12+squeeze,y:.86-squeeze,held:true});}}
         else if(!start.dragged&&distance>6){start.dragged=true;void invoke('drag_pet').catch(e=>setNotice(String(e)));}}}
@@ -76,10 +88,10 @@ export function DesktopPet() {
       onPointerCancel={()=>{cancelHold();setSquash({x:1,y:1,held:false});pointer.current=null;}}
       onLostPointerCapture={()=>{cancelHold();setSquash({x:1,y:1,held:false});}}
       onClick={e=>{if(hold.current.fired){hold.current.fired=false;pointer.current=null;return;}if(!pointer.current?.dragged){if(p.pinch){showPhrase();}else toggleMode();void refresh();
-        if(e.detail===0){audio.play('press');setTimeout(()=>audio.play('release'),160);}}pointer.current=null;}}>
+        if(e.detail===0){void refreshQuota();audio.play('press');setTimeout(()=>audio.play('release'),160);}}pointer.current=null;}}>
       {shown?<img className={`pet-art pet-art-${shown}`} src={`/pets/${shown}.webp`} draggable={false} alt="" />:<span className="pet-generic">✦</span>}
     </button>
-    <section className={`pet-widget ${open?'is-expanded':''}`} aria-label="桌宠用量">
+    <section className={`pet-widget ${open?'is-expanded':''}`} aria-label="桌宠用量" aria-busy={quotaRefreshing} title={quotaRefreshing?'正在刷新额度…':undefined}>
       <header><button className="pet-model" title={model} aria-label="切换详细模式" aria-expanded={open}
         onPointerDown={e=>{if(e.button===0){startHold(e.screenX,e.screenY);e.currentTarget.setPointerCapture(e.pointerId);}}}
         onPointerMove={e=>moveHold(e.screenX,e.screenY)} onPointerUp={cancelHold} onPointerCancel={cancelHold} onLostPointerCapture={cancelHold}

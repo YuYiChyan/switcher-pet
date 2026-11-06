@@ -131,6 +131,10 @@ pub fn unify_catalog(store:&crate::account::AccountStore, entries:&mut Vec<serde
     *entries=result;
     if !api_format {for entry in entries {complete_catalog_entry(entry);}}
 }
+fn automatic_relay_supported(model: &relay_catalog::Model) -> bool {
+    !model.local_agy && matches!(model.protocol.as_str(), "responses" | "chat_completions")
+}
+
 pub fn groups(store:&crate::account::AccountStore)->Vec<serde_json::Value> {
     let candidates = relay_catalog::candidates(&store);
     let mut groups: Vec<_> = relay_catalog::models(&store).into_iter().filter_map(|model| {
@@ -141,7 +145,7 @@ pub fn groups(store:&crate::account::AccountStore)->Vec<serde_json::Value> {
                 !map.contains_key(&model.upstream) && map.iter().any(|(logical,wire)|logical!=wire && wire==&s.upstream)) &&
             seen.insert(s.account_id.clone())).map(|source| {
             serde_json::json!({"id":source.account_id,"name":source.account_name,"protocol":source.protocol,
-                "automatic_supported":source.protocol == "responses" && !source.local_agy})
+                "automatic_supported":automatic_relay_supported(&source)})
         }).collect();
         // A mapped wire ID is an implementation detail of that logical model,
         // not a second selector. Keep it only if another source exposes it directly.
@@ -158,7 +162,7 @@ pub fn groups(store:&crate::account::AccountStore)->Vec<serde_json::Value> {
                 groups.push(serde_json::json!({"model":logical_model(logical),"slug":logical_model(logical),"current":account.id,
                     "policy":store.settings.model_route_policies.get(logical).cloned().unwrap_or_default(),
                     "sources":[{"id":source.account_id,"name":source.account_name,"protocol":source.protocol,
-                        "automatic_supported":source.protocol=="responses"&&!source.local_agy}]}));
+                        "automatic_supported":automatic_relay_supported(&source)}]}));
             }
         }
     }
@@ -257,8 +261,10 @@ pub fn set_model_route_policy(state: State<AppState>, app: tauri::AppHandle, mod
     if !candidates.iter().any(|m| relay_catalog::normalized_upstream(m) == model || relay_catalog::configured_on_account(&store,&model,&m.account_id).is_some()) &&
         !store.accounts.keys().any(|id|google_supports(&store,id,&model)||native_supports(&store,id,&model)) { return Err("Unknown model".into()); }
     for id in &policy.allowed_sources {
-        if !native_supports(&store,id,&model) && !google_supports(&store,id,&model) && !relay_catalog::configured_on_account(&store,&model,id).is_some_and(|m|m.protocol=="responses"&&!m.local_agy) {
-            return Err("Automatic sources must explicitly support this exact model via Responses".into());
+        if !native_supports(&store,id,&model) && !google_supports(&store,id,&model) && !relay_catalog::configured_on_account(&store,&model,id).is_some_and(|m|automatic_relay_supported(&m)) {
+            if policy.auto_switch || !store.settings.model_route_policies.get(&model).is_some_and(|old|old.allowed_sources.contains(id)) {
+                return Err("自动来源必须明确支持当前模型；请移除失效来源或先配置同模型映射。支持 Responses 和 Chat Completions。".into());
+            }
         }
     }
     // Merge only this policy; do not overwrite unrelated settings from stale UI state.

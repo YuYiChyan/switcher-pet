@@ -103,8 +103,8 @@ async fn balance(client: &reqwest::Client, base: &str, key: &str, adapter: &str)
     Ok((RelayUsageCache { balance_capacity_estimated:false, balance_capacity:capacity.filter(|v|v.is_finite() && *v>0.0), remaining:amount, unit, is_active:active, updated_at:Utc::now(), next_reset_at:None,windows:capacity.filter(|v|v.is_finite() && *v>0.0).map(|total|vec![crate::account::RelayQuotaWindow{label:"balance".into(),remaining_percent:Some((amount/total*100.0).clamp(0.0,100.0)),reset_at:None}]).unwrap_or_default() },adapter.to_owned()))
 }
 
-async fn run(app: &tauri::AppHandle, id: &str, manual: bool) -> Result<(), String> {
-    let _guard=RUNNING.try_lock().map_err(|_|"A probe is already running")?;
+async fn run(app: &tauri::AppHandle, id: &str, manual: bool, quota_only: bool) -> Result<(), String> {
+    let _guard=if quota_only { RUNNING.lock().await } else { RUNNING.try_lock().map_err(|_|"A probe is already running")? };
     let state=app.state::<AppState>();
     let (base,key,policy)= {
         let store=state.store.lock().map_err(|e|e.to_string())?;
@@ -119,6 +119,7 @@ async fn run(app: &tauri::AppHandle, id: &str, manual: bool) -> Result<(), Strin
     let mut errors=Vec::new();
     let mut ran=false;
     for kind in ["models","balance"] {
+        if quota_only && kind=="models" {continue;}
         let enabled=if kind=="models" {manual || policy.probe_models} else {policy.balance_adapter!="off"};
         if !enabled {continue;}
         let status_key=format!("{id}:{kind}");
@@ -182,8 +183,10 @@ async fn run(app: &tauri::AppHandle, id: &str, manual: bool) -> Result<(), Strin
     if errors.is_empty(){Ok(())}else{Err(errors.join("; "))}
 }
 
+pub async fn refresh_balance(app: &tauri::AppHandle, id: &str) -> Result<(),String> {run(app,id,true,true).await}
+
 #[tauri::command]
-pub async fn probe_source_now(app: tauri::AppHandle, id: String) -> Result<(),String> {run(&app,&id,true).await}
+pub async fn probe_source_now(app: tauri::AppHandle, id: String) -> Result<(),String> {run(&app,&id,true,false).await}
 
 pub fn start(app: tauri::AppHandle) {
     // One-time backfill of the fork's existing API observations. A baseline
@@ -208,7 +211,7 @@ pub fn start(app: tauri::AppHandle) {
                 state.store.lock().map(|store|store.accounts.iter()
                     .filter(|(id,a)|{let p=policy_for(&store,id);a.is_relay() && !a.is_banned && !a.is_logged_out && (p.probe_models || p.balance_adapter!="off")}).map(|(id,_)|id.clone()).collect::<Vec<_>>()).unwrap_or_default()
             };
-            for id in ids {let _=run(&app,&id,false).await;}
+            for id in ids {let _=run(&app,&id,false,false).await;}
         }
     });
 }

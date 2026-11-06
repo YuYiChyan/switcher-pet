@@ -90,3 +90,6 @@ mod regressions {
         }
     }
 }
+
+#[path = "../../src-tauri/src/menu_monitor.rs"]
+pub mod menu_monitor;

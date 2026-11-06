@@ -98,7 +98,7 @@ export function ModelRoutes({ accounts, onAddSource }: { accounts: Account[]; on
                 </div> : source.protocol === 'openai_key' ? <small className="model-source-identity">OpenAI API · 按量计费，不属于 ChatGPT 订阅</small> : null}
               </td>
               <td>{source.protocol}{source.upstream_model !== model.model && <small style={{ display: 'block' }}>→ {source.upstream_model}</small>}</td>
-              <td><input type="checkbox" aria-label={`${source.name} auto`} disabled={!source.automatic_supported}
+              <td><input type="checkbox" aria-label={`${source.name} auto`} disabled={!source.automatic_supported && !model.policy.allowed_sources.includes(source.id)}
                 checked={model.policy.allowed_sources.includes(source.id)} onChange={e => policy({ ...model.policy,
                   allowed_sources: e.target.checked ? [...model.policy.allowed_sources, source.id] : model.policy.allowed_sources.filter(id => id !== source.id) })} /></td>
             </tr>)}

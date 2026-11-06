@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 export const petFamilies = ['gpt','claude','deepseek','gemini','grok','kimi','qwen','glm'];
-export type PetPreferences = { silent_start:boolean; pinch:boolean; follow_activity:boolean; fixed_family:string; muted:boolean; total:boolean; volume:number; reduce_motion:boolean; detailed:boolean };
+export type PetPreferences = { silent_start:boolean; pinch:boolean; follow_activity:boolean; fixed_family:string; muted:boolean; total:boolean; volume:number; reduce_motion:boolean; detailed:boolean; menu_scope:'pool'|'model'|'account'; menu_weekly:boolean };
 export type PetActivity = {model:string;source:string;account_id:string;at:number;session_id:string;origin:string};
 export function usePetPreferences() {
-  const [preferences,setPreferences]=useState<PetPreferences>({silent_start:true,pinch:true,follow_activity:true,fixed_family:'gpt',muted:false,total:true,volume:.5,reduce_motion:false,detailed:false});
+  const [preferences,setPreferences]=useState<PetPreferences>({silent_start:true,pinch:true,follow_activity:true,fixed_family:'gpt',muted:false,total:true,volume:.5,reduce_motion:false,detailed:false,menu_scope:'pool',menu_weekly:false});
   const [error,setError]=useState('');
   const ref=useRef(preferences);
   const accept=(p:PetPreferences)=>{ref.current=p;setPreferences(p);};

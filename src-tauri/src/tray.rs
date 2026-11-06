@@ -44,6 +44,19 @@ pub fn init(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
+            #[cfg(target_os = "macos")]
+            id if id.starts_with("monitor-") => {
+                if id == "monitor-refresh" {
+                    let app=app.clone();tauri::async_runtime::spawn(async move {let _=crate::pet_refresh::refresh_pet_quota(app).await;});
+                } else {
+                    let state=app.state::<crate::AppState>();
+                    let prefs=state.store.lock().ok().map(|s|s.settings.pet_preferences.clone());
+                    if let Some(mut prefs)=prefs {
+                        match id {"monitor-pool"=>prefs.menu_scope="pool".into(),"monitor-model"=>prefs.menu_scope="model".into(),"monitor-account"=>prefs.menu_scope="account".into(),"monitor-weekly"=>prefs.menu_weekly=!prefs.menu_weekly,_=>return}
+                        if crate::pet_preferences::set_pet_preferences(app.clone(),prefs).is_ok(){let _=update_tray_native_menu(app);}
+                    }
+                }
+            },
             "tray-show-main" => show_main_window_from_cmd(app),
             "tray-show-pet" => {let app=app.clone();tauri::async_runtime::spawn(async move {let _=crate::pet::open_pet(app).await;});},
             "tray-next-account" => {
@@ -74,6 +87,8 @@ pub fn init(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         })
         .build(app)?;
 
+    #[cfg(target_os = "macos")]
+    crate::menu_monitor::start(app.clone());
     println!("[Tray] 系统托盘已启动");
     Ok(())
 }
@@ -96,7 +111,20 @@ fn build_native_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let separator = PredefinedMenuItem::separator(app)?;
     let quit = PredefinedMenuItem::quit(app, Some(crate::i18n::tray_quit()))?;
     let pet=MenuItem::with_id(app,"tray-show-pet","显示桌宠",true,None::<&str>)?;
-    Menu::with_items(app, &[&pet, &show_main, &next_account, &separator, &quit])
+    let menu=Menu::with_items(app, &[&pet, &show_main, &next_account, &separator, &quit])?;
+    #[cfg(target_os = "macos")]
+    {
+        use tauri::menu::{CheckMenuItem, Submenu};
+        let prefs=app.state::<crate::AppState>().store.lock().map(|s|s.settings.pet_preferences.clone()).unwrap_or_default();
+        let pool=CheckMenuItem::with_id(app,"monitor-pool","总池额度",true,prefs.menu_scope=="pool",None::<&str>)?;
+        let model=CheckMenuItem::with_id(app,"monitor-model","当前模型池",true,prefs.menu_scope=="model",None::<&str>)?;
+        let account=CheckMenuItem::with_id(app,"monitor-account","当前账号",true,prefs.menu_scope=="account",None::<&str>)?;
+        let weekly=CheckMenuItem::with_id(app,"monitor-weekly","优先显示周额度",true,prefs.menu_weekly,None::<&str>)?;
+        let refresh=MenuItem::with_id(app,"monitor-refresh","立即刷新额度",true,None::<&str>)?;
+        let monitor=Submenu::with_items(app,"菜单栏用量",true,&[&pool,&model,&account,&weekly,&refresh])?;
+        menu.insert(&monitor,0)?;
+    }
+    Ok(menu)
 }
 
 pub fn update_tray_native_menu(app: &AppHandle) -> tauri::Result<()> {

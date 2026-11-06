@@ -4,6 +4,18 @@ import { createTranslator } from './translator';
 // Earlier UI translations adapted from InventiveSpark/codex-switcher (MIT).
 // Additional translations cover the current UI and preserve source placeholders.
 export const englishReplacements: readonly (readonly [string, string])[] = [
+  ["额度刷新：", "Quota refresh: "],
+  ["个成功，", " succeeded; "],
+  ["个暂未更新，保留上次记录", " unavailable; previous values retained"],
+  ["正在刷新额度…", "Refreshing quota…"],
+  ["额度 —", "Quota —"],
+  ["自动来源必须明确支持当前模型；请移除失效来源或先配置同模型映射。支持 Responses 和 Chat Completions。", "Automatic sources must support this exact model. Remove unavailable sources or configure an exact model mapping. Responses and Chat Completions are supported."],
+  ["额度状态暂时不可读", "Quota status is temporarily unavailable"],
+  ["缺少访问令牌", "Access token missing"],
+  ["额度缓存暂时不可写", "Quota cache is temporarily unavailable"],
+  ["来源已删除", "Source was removed"],
+  ["来源已更新，请重试", "Source changed; please retry"],
+
   ["登录账号：", "Login:"],
   ["未返回邮箱", "Email not returned"],
   ["· 席位", "· Seat"],

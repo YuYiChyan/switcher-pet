@@ -11,6 +11,8 @@ mod pool_math;
 mod pool_api;
 mod source_probe;
 mod pet;
+mod pet_refresh;
+mod menu_monitor;
 mod pet_preferences;
 mod activity_scan;
 mod anchor_recovery;
@@ -6571,6 +6573,7 @@ pub fn run() {
             model_routes::set_model_route_policy,
             model_routes::set_model_source,
             pool_api::get_pool_dashboard,
+            pet_refresh::refresh_pet_quota,
             pool_api::set_source_policy,
             source_probe::probe_source_now,
             pet_preferences::get_pet_preferences,
@@ -6691,7 +6694,7 @@ pub fn run() {
             remote_restart_server,
             ];
             move |invoke: tauri::ipc::Invoke| {
-                if invoke.message.webview().label()=="pet" && !["get_system_locale","set_app_locale","get_pool_dashboard","get_pet_activity","get_pet_preferences","set_pet_preferences","get_pet_sound","pet_menu","drag_pet","resize_pet","hide_pet"].contains(&invoke.message.command()) {
+                if invoke.message.webview().label()=="pet" && !["get_system_locale","set_app_locale","get_pool_dashboard","refresh_pet_quota","get_pet_activity","get_pet_preferences","set_pet_preferences","get_pet_sound","pet_menu","drag_pet","resize_pet","hide_pet"].contains(&invoke.message.command()) {
                     invoke.resolver.reject("The pet surface cannot access account secrets or unrelated application commands.");return true;
                 }
                 if referral_browser::isolated_window(invoke.message.webview().label()) {

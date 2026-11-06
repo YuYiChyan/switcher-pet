@@ -1,0 +1,62 @@
+name: Self-use macOS universal preview
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  macos:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - name: Install dependencies
+        run: npm ci
+      - name: Unit tests
+        run: |
+          node --test scripts/*.test.mjs
+          cargo test --locked --manifest-path tests/compat-harness/Cargo.toml
+      - name: Build universal application
+        env:
+          APPLE_SIGNING_IDENTITY: "-"
+        run: |
+          export RUSTFLAGS="--remap-path-prefix=$GITHUB_WORKSPACE=/src --remap-path-prefix=$HOME=/build-user"
+          npx tauri build --target universal-apple-darwin --bundles app -- --locked
+      - name: Verify and package
+        run: |
+          APP="src-tauri/target/universal-apple-darwin/release/bundle/macos/Switcher Pet.app"
+          BIN="$APP/Contents/MacOS/switcher-pet"
+          test -x "$BIN"
+          lipo -verify_arch arm64 x86_64 "$BIN"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          # Isolated smoke launch; no account import, proxy, or production credentials.
+          "$BIN" --validation > mac-smoke.log 2>&1 &
+          PID=$!
+          sleep 12
+          kill -0 "$PID"
+          kill "$PID"
+          wait "$PID" || true
+          mkdir -p release
+          ditto -c -k --sequesterRsrc --keepParent "$APP" release/SwitcherPet-macOS-universal.app.zip
+          cp README.macOS.md release/
+          cp LICENSE release/LICENSE-upstream.txt
+          cp public/pets/LICENSE-CC-BY-NC-4.0.txt release/LICENSE-pet-assets.txt
+          cp public/pets/NOTICE.md release/NOTICE-pet-assets.md
+          (cd release && shasum -a 256 SwitcherPet-macOS-universal.app.zip > SHA256.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SwitcherPet-macOS-universal
+          path: release/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: macOS-build-diagnostics
+          path: mac-smoke.log
+          if-no-files-found: ignore
